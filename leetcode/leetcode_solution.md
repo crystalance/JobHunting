@@ -183,7 +183,7 @@
 2. the feature of the fast-slow pointer:
 
    1. leetcode 142
-   2. <img src="/Users/lanceliao/Library/Application Support/typora-user-images/image-20241027002447299.png" alt="image-20241027002447299" style="zoom:50%;" />
+   2. <img src="images/image-20241027002447299.png" alt="image-20241027002447299" style="zoom:50%;" />
 
 
 #### 2. 自己构建双向链表实现LRU
@@ -1278,7 +1278,7 @@ class Solution:
 
 1. how to get topological sorting?
 
-   1. ![image-20240716150702323](/Users/lanceliao/Library/Application Support/typora-user-images/image-20240716150702323.png)
+   1. ![image-20240716150702323](images/image-20240716150702323.png)
 
    2. STEPs
 
@@ -1384,7 +1384,7 @@ class Solution:
 
 #### 滑动窗口+单调队列
 
-![image-20250710001646252](/Users/lanceliao/Library/Application Support/typora-user-images/image-20250710001646252.png)
+![image-20250710001646252](images/image-20250710001646252.png)
 
 1. 
 
@@ -3322,14 +3322,14 @@ class Solution:
 1. apart from search a specific value, (like 6 in 2 5 3 3 8 7 6 8 9 0), we can search a value meets some condition 
    1. just add the condition to the 
       1. in problem 162
-         1. ![image-20241024162137120](/Users/lanceliao/Library/Application Support/typora-user-images/image-20241024162137120.png)
+         1. ![image-20241024162137120](images/image-20241024162137120.png)
          2. the condition is larger than neighbor nodes or is the egde node
    2. Just to remember: 理解二分，请牢记区间的定义！区间内的数（下标）都是还未确定大小关系的，有的是 <，有的是 ≥；区间外的数（下标）都是确定大小关系的！对于本题（递增数组），区间左侧外面的都是 <，区间右侧外面的都是 ≥。从这个定义可以知道，找到了 ≥ 的数之后，要把这个数（下标）放在区间外面，而不是区间里面！
    3. for example:
-      1. ![image-20241212153948374](/Users/lanceliao/Library/Application Support/typora-user-images/image-20241212153948374.png)
+      1. ![image-20241212153948374](images/image-20241212153948374.png)
       2. in this type, ` if nums[mid] < target` means that all the elements with index <= mid are less than target, so you just change the leftbound of the interval to mid+1 (` left = mid + 1`)
-   4. ![image-20250126143229789](/Users/lanceliao/Library/Application Support/typora-user-images/image-20250126143229789.png)
-   5. ![image-20250126143132128](/Users/lanceliao/Library/Application Support/typora-user-images/image-20250126143132128.png)
+   4. ![image-20250126143229789](images/image-20250126143229789.png)
+   5. ![image-20250126143132128](images/image-20250126143132128.png)
    6. Why left?
       1. look the ternimation condition, when left = [every thing that lower than target]+1
       1. 统一写法：双闭区间，返回left指针（根据if else条件比target小的，都在left指针的左边）
@@ -3468,7 +3468,7 @@ class Solution:
          1. 每种物品至多用一次
          2. 先遍历物品，再从大到小遍历背包容量
             1. 之所以从大到小遍历是因为确保对于每个重量，每个物品至多用一次
-            2. ![Screenshot 2024-11-29 at 18.50.30](/Users/lanceliao/Library/Application Support/typora-user-images/Screenshot 2024-11-29 at 18.50.30.png)
+            2. ![Screenshot 2024-11-29 at 18.50.30](images/Screenshot 2024-11-29 at 18.50.30.png)
          3. 例题
             1. [416. Partition Equal Subset Sum](https://leetcode.cn/problems/partition-equal-subset-sum/)
             2. 
@@ -3531,7 +3531,7 @@ class Solution:
    3. main idea
       1. instead of updating a whole bunch of subarray, just update one value in difference array to make that happen
       2. since they are equivalent
-      3. ![Screenshot 2024-11-14 at 22.55.39](/Users/lanceliao/Library/Application Support/typora-user-images/Screenshot 2024-11-14 at 22.55.39.png)
+      3. ![Screenshot 2024-11-14 at 22.55.39](images/Screenshot 2024-11-14 at 22.55.39.png)
    4. For example, in
       1. https://leetcode.cn/problems/count-positions-on-street-with-required-brightness/
       2. instead of adding brightness to every position in the range of a light, in stead, just record what's added and what deleted between moving from  previous position to current position

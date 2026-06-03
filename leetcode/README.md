@@ -9,6 +9,7 @@ Decomposed from `leetcode_solution.md` by topic. Algorithms first, then data str
 - [Recursion (递归)](01-algorithm/03-recursion.md)
 - [Backtracking (回溯)](01-algorithm/04-backtracking.md)
 - [Sorting (排序)](01-algorithm/05-sorting.md)
+- [Binary Search (二分查找)](01-algorithm/11-binary-search.md)
 - [Union Find (并查集)](01-algorithm/06-union-find.md)
 - [Divide and Conquer](01-algorithm/07-divide-and-conquer.md)
 - [Priority Queue](01-algorithm/08-priority-queue.md)

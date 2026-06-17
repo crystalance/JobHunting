@@ -1,0 +1,37 @@
+# ── Core: Copilot SDK + Azure OpenAI + auth ─────────────────────────
+# The Copilot Python SDK drives every agent process (one CLI subprocess
+# per agent). It is distributed internally; install per your team's
+# instructions (e.g. `pip install copilot-python-sdk` from the internal
+# index, or `pip install -e <path-to-sdk>`).
+copilot
+
+openai>=1.40
+azure-identity>=1.17
+python-dotenv>=1.0
+tenacity>=8.2
+
+# ── HTTP / parsing / utilities ──────────────────────────────────────
+requests>=2.31
+filelock>=3.13
+beautifulsoup4>=4.12
+markdownify>=0.11
+pydantic>=2.6
+
+# ── Document parsing (used by custom tools) ─────────────────────────
+pypdf>=4.0
+PyMuPDF>=1.24
+
+# ── Optional Python-execution tool (if you enable a Jupyter executor) ─
+jupyter-client>=8.6
+ipykernel>=6.29
+
+# ── Batch eval / metrics ────────────────────────────────────────────
+pandas>=2.2
+numpy>=1.26
+
+# ── Dataset access (GAIA + WideSearch loaders) ──────────────────────
+datasets>=2.18
+huggingface-hub>=0.22
+
+# ── Testing (optional) ──────────────────────────────────────────────
+pytest>=8.0

@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Run 20260616 - Stage A + B Status</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+         max-width: 1200px; margin: 0 auto; padding: 24px; color: #1f2937; line-height: 1.5; }
+  h1 { color: #4f46e5; border-bottom: 3px solid #4f46e5; padding-bottom: 8px; }
+  h2 { color: #6d28d9; margin-top: 32px; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; }
+  code { background: #f3f4f6; padding: 1px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 0.92em; }
+  table { border-collapse: collapse; width: 100%; margin: 14px 0; font-size: 0.92em; }
+  th { background: #4f46e5; color: white; text-align: left; padding: 8px 10px; }
+  td { border: 1px solid #d1d5db; padding: 6px 10px; vertical-align: top; }
+  tr.band-100 td { background: #d1fae5; }
+  tr.band-80  td { background: #ecfdf5; }
+  tr.band-50  td { background: #fef3c7; }
+  tr.band-low td { background: #fee2e2; }
+  .small { color: #6b7280; font-size: 0.88em; }
+  .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 18px 0; }
+  .stat-card { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 14px 16px; }
+  .stat-card .label { color: #6b7280; font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.5px; }
+  .stat-card .value { font-size: 1.7em; font-weight: 700; color: #111827; }
+  .stat-card.green .value { color: #047857; }
+  .stat-card.amber .value { color: #b45309; }
+  .stat-card.red .value { color: #b91c1c; }
+  .callout { padding: 14px 18px; border-radius: 6px; margin: 14px 0; }
+  .callout.info { background: #eff6ff; border-left: 4px solid #2563eb; }
+  .callout.ok   { background: #ecfdf5; border-left: 4px solid #10b981; }
+  .callout.warn { background: #fffbeb; border-left: 4px solid #f59e0b; }
+  ul { padding-left: 22px; }
+  li { margin-bottom: 4px; }
+  .mermaid { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px;
+             padding: 18px; margin: 16px 0; text-align: center; }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+  window.addEventListener("load", function () {
+    if (window.mermaid) {
+      mermaid.initialize({ startOnLoad: true, theme: "neutral", flowchart: { useMaxWidth: true } });
+    }
+  });
+</script>
+</head>
+<body>
+
+<h1>Run 20260616 - Stage A + Stage B Status</h1>
+<p class="small">Headline + sections 1/2 refreshed 2026-06-18 after the 2h-cap + instance-batching
+rerun (sections 7-8). Per-case gold files are the source of truth.</p>
+
+<h2>Headline</h2>
+<div class="stat-grid">
+  <div class="stat-card"><div class="label">Templates (Stage A)</div><div class="value">50 / 50</div></div>
+  <div class="stat-card green"><div class="label">Cases with values</div><div class="value">37 / 50</div></div>
+  <div class="stat-card amber"><div class="label">Empty (rerunning + never-run)</div><div class="value">11</div></div>
+  <div class="stat-card"><div class="label">Faithful all-null</div><div class="value">2</div></div>
+</div>
+
+<div class="stat-grid">
+  <div class="stat-card green"><div class="label">Verified instances</div><div class="value">309 / 441</div></div>
+  <div class="stat-card green"><div class="label">Verified rate</div><div class="value">70.1%</div></div>
+  <div class="stat-card"><div class="label">Baseline (run_20260615)</div><div class="value">22.7%</div></div>
+  <div class="stat-card amber"><div class="label">Re-running now</div><div class="value">8</div></div>
+</div>
+
+<div class="callout ok">
+<strong>Current state (all 50 templates, gold-derived):</strong> 37 cases have resolved values
+(<strong>309 / 441 instances build-time verified = 70.1%</strong>), vs 22.7% baseline. The 2h-cap +
+instance-batching rerun (section 8) recovered 13 of the original timeouts into section 1.<br>
+<strong>Still open (13):</strong> 2 cases ran but are faithfully all-null (no authoritative value
+exists - <code>soc-33-1021</code>, <code>soc-47-4011.01</code>); 11 are empty - <strong>8 are
+re-running now</strong> after a transient Copilot auth blip, and 3 large cases never ran
+(<code>soc-17-2071</code> 102, <code>soc-17-2081</code> 149, <code>soc-25-1126</code> 90).<br>
+<strong>Note:</strong> "verified instances" is the build-time verifier flag. The stricter
+live-fetch (Gate 3) refresh-readiness rate is tracked separately in section 7.
+</div>
+
+<h2>1. Per-case results (38 ok cases)</h2>
+<p class="small">Color: green = 100%; light green = 80-99%; amber = 50-79%; red = below 50%.
+   The last 13 rows are the cases recovered by the 2h-cap + instance-batching rerun (section 8).</p>
+<table><thead><tr><th>Case</th><th>Verified</th><th>Pass %</th><th>Elapsed (s)</th></tr></thead><tbody><tr class="band-100"><td>soc-11-1011.00_task-8834_v1</td><td>16/16</td><td>100.0</td><td>584</td></tr><tr class="band-100"><td>soc-19-4012.01_task-20875_v2</td><td>14/14</td><td>100.0</td><td>1059</td></tr><tr class="band-100"><td>soc-27-2012.03_task-7669_v1</td><td>12/12</td><td>100.0</td><td>1052</td></tr><tr class="band-100"><td>soc-13-2051.00_task-21580_v1</td><td>8/8</td><td>100.0</td><td>392</td></tr><tr class="band-100"><td>soc-19-2043.00_task-9106_v2</td><td>7/7</td><td>100.0</td><td>1344</td></tr><tr class="band-100"><td>soc-29-1141.00_task-1861_v2</td><td>7/7</td><td>100.0</td><td>1240</td></tr><tr class="band-100"><td>soc-53-1044.00_task-23698_v1</td><td>6/6</td><td>100.0</td><td>1076</td></tr><tr class="band-100"><td>soc-47-5032.00_task-9910_v2</td><td>4/4</td><td>100.0</td><td>164</td></tr><tr class="band-100"><td>soc-53-6041.00_task-8647_v2</td><td>4/4</td><td>100.0</td><td>623</td></tr><tr class="band-100"><td>soc-47-1011.03_task-17738_v2</td><td>4/4</td><td>100.0</td><td>1246</td></tr><tr class="band-100"><td>soc-19-1041.00_task-15215_v1</td><td>3/3</td><td>100.0</td><td>310</td></tr><tr class="band-100"><td>soc-29-1141.03_task-18339_v2</td><td>3/3</td><td>100.0</td><td>855</td></tr><tr class="band-80"><td>soc-15-2051.02_task-16279_v2</td><td>49/50</td><td>98.0</td><td>497</td></tr><tr class="band-80"><td>soc-41-1011.00_task-670_v1</td><td>15/16</td><td>93.8</td><td>1566</td></tr><tr class="band-80"><td>soc-13-1161.01_task-16187_v1</td><td>12/13</td><td>92.3</td><td>453</td></tr><tr class="band-80"><td>soc-19-2042.00_task-19772_v1</td><td>15/17</td><td>88.2</td><td>1464</td></tr><tr class="band-80"><td>soc-13-2054.00_task-21614_v1</td><td>16/19</td><td>84.2</td><td>1704</td></tr><tr class="band-80"><td>soc-51-9071.00_task-23627_v2</td><td>5/6</td><td>83.3</td><td>328</td></tr><tr class="band-50"><td>soc-13-2041.00_task-1259_v1</td><td>6/8</td><td>75.0</td><td>1372</td></tr><tr class="band-50"><td>soc-11-9141.00_task-7228_v1</td><td>3/4</td><td>75.0</td><td>1391</td></tr><tr class="band-50"><td>soc-41-3031.00_task-23211_v2</td><td>12/18</td><td>66.7</td><td>1798</td></tr><tr class="band-50"><td>soc-21-1021.00_task-254_v2</td><td>5/8</td><td>62.5</td><td>1498</td></tr><tr class="band-low"><td>soc-11-9013.00_task-21387_v1</td><td>3/7</td><td>42.9</td><td>1612</td></tr><tr class="band-low"><td>soc-27-4012.00_task-18653_v1</td><td>1/3</td><td>33.3</td><td>1123</td></tr><tr class="band-low"><td>soc-33-3031.00_task-7925_v2</td><td>1/3</td><td>33.3</td><td>985</td></tr><tr class="band-80"><td>soc-25-9031.00_task-22450_v2</td><td>18/20</td><td>90.0</td><td>1068</td></tr><tr class="band-80"><td>soc-33-1091.00_task-22959_v2</td><td>26/31</td><td>83.9</td><td>1968</td></tr><tr class="band-80"><td>soc-37-1011.00_task-9535_v2</td><td>10/12</td><td>83.3</td><td>1350</td></tr><tr class="band-50"><td>soc-17-2051.00_task-147_v2</td><td>12/16</td><td>75.0</td><td>1758</td></tr><tr class="band-50"><td>soc-17-2171.00_task-3579_v2</td><td>7/13</td><td>53.8</td><td>1572</td></tr><tr class="band-low"><td>soc-11-3121.00_task-1000_v2</td><td>3/13</td><td>23.1</td><td>1362</td></tr><tr class="band-low"><td>soc-41-4011.07_task-17655_v1</td><td>1/11</td><td>9.1</td><td>1782</td></tr><tr class="band-low"><td>soc-19-3011.00_task-7541_v2</td><td>1/22</td><td>4.5</td><td>2388</td></tr><tr class="band-low"><td>soc-17-2199.03_task-18156_v1</td><td>0/9</td><td>0.0</td><td>2478</td></tr><tr class="band-low"><td>soc-33-1021.00_task-22923_v2</td><td>0/5</td><td>0.0</td><td>2262</td></tr><tr class="band-low"><td>soc-17-2199.11_task-16572_v1</td><td>0/11</td><td>0.0</td><td>1698</td></tr><tr class="band-low"><td>soc-47-4011.01_task-18079_v1</td><td>0/6</td><td>0.0</td><td>744</td></tr><tr class="band-low"><td>soc-13-1075.00_task-18896_v2</td><td>0/11</td><td>0.0</td><td>294</td></tr></tbody></table>
+
+<h2>2. Original 30-min timeouts - rerun outcome</h2>
+<p class="small">These 20 cases hit the original 30-min cap. After the 2h-cap + instance-batching
+rerun (section 8), their current status (from the gold files):
+<strong>13 completed with values</strong> and now appear in section 1;
+<strong>2 ran but are faithfully all-null</strong> (<code>soc-33-1021</code>,
+<code>soc-47-4011.01</code> - no authoritative value exists);
+<strong>7 are still empty and re-running</strong> after a transient Copilot auth blip
+(<code>soc-11-9161</code>, <code>soc-13-1081</code>, <code>soc-33-3021</code>,
+<code>soc-13-2022</code>, <code>soc-11-3051</code>, <code>soc-15-2011</code>,
+<code>soc-51-8013</code>). The historical 30-min snapshot (size = fixed_instances + 5 *
+discovered_facts) is kept below for reference.</p>
+<table><thead><tr><th>Case</th><th>Size</th><th>Fixed inst.</th><th>Discovered facts</th><th>Elapsed (min)</th></tr></thead><tbody><tr class=""><td>soc-13-1081.01_task-20003_v2</td><td>61</td><td>56</td><td>1</td><td>30.0</td></tr><tr class=""><td>soc-15-2011.00_task-3510_v2</td><td>48</td><td>3</td><td>9</td><td>30.1</td></tr><tr class=""><td>soc-33-3021.00_task-23029_v1</td><td>48</td><td>48</td><td>0</td><td>30.0</td></tr><tr class=""><td>soc-13-2022.00_task-21539_v2</td><td>42</td><td>2</td><td>8</td><td>30.1</td></tr><tr class=""><td>soc-11-3051.00_task-21337_v2</td><td>36</td><td>11</td><td>5</td><td>30.1</td></tr><tr class=""><td>soc-11-9161.00_task-7274_v1</td><td>34</td><td>34</td><td>0</td><td>30.0</td></tr><tr class=""><td>soc-51-8013.00_task-23619_v1</td><td>29</td><td>14</td><td>3</td><td>30.1</td></tr><tr class=""><td>soc-13-1075.00_task-18896_v2</td><td>26</td><td>11</td><td>3</td><td>31.0</td></tr><tr class=""><td>soc-19-3011.00_task-7541_v2</td><td>22</td><td>22</td><td>0</td><td>30.0</td></tr><tr class=""><td>soc-33-1091.00_task-22959_v2</td><td>22</td><td>2</td><td>4</td><td>30.1</td></tr><tr class=""><td>soc-25-9031.00_task-22450_v2</td><td>20</td><td>20</td><td>0</td><td>30.1</td></tr><tr class=""><td>soc-11-3121.00_task-1000_v2</td><td>18</td><td>13</td><td>1</td><td>30.0</td></tr><tr class=""><td>soc-37-1011.00_task-9535_v2</td><td>17</td><td>12</td><td>1</td><td>30.1</td></tr><tr class=""><td>soc-17-2051.00_task-147_v2</td><td>16</td><td>16</td><td>0</td><td>30.1</td></tr><tr class=""><td>soc-33-1021.00_task-22923_v2</td><td>15</td><td>5</td><td>2</td><td>30.0</td></tr><tr class=""><td>soc-17-2171.00_task-3579_v2</td><td>13</td><td>13</td><td>0</td><td>30.0</td></tr><tr class=""><td>soc-17-2199.11_task-16572_v1</td><td>13</td><td>3</td><td>2</td><td>30.1</td></tr><tr class=""><td>soc-17-2199.03_task-18156_v1</td><td>11</td><td>6</td><td>1</td><td>30.0</td></tr><tr class=""><td>soc-41-4011.07_task-17655_v1</td><td>11</td><td>11</td><td>0</td><td>30.1</td></tr><tr class=""><td>soc-47-4011.01_task-18079_v1</td><td>6</td><td>6</td><td>0</td><td>30.0</td></tr></tbody></table>
+
+<h2>3. Pending (5 cases)</h2>
+<table><thead><tr><th>Case</th><th>Size</th><th>Fixed inst.</th><th>Discovered facts</th></tr></thead><tbody><tr class=""><td>soc-29-1229.05_task-17217_v1</td><td>64</td><td>4</td><td>12</td></tr><tr class=""><td>soc-11-3031.03_task-15674_v1</td><td>70</td><td>10</td><td>12</td></tr><tr class=""><td>soc-25-1126.00_task-6378_v1</td><td>90</td><td>90</td><td>0</td></tr><tr class=""><td>soc-17-2071.00_task-1364_v2</td><td>102</td><td>12</td><td>18</td></tr><tr class=""><td>soc-17-2081.00_task-19624_v2</td><td>149</td><td>144</td><td>1</td></tr></tbody></table>
+
+<h2>4. Pipeline changes shipped before this run</h2>
+<ul>
+  <li><strong>Stage A reviewer (LLM):</strong> second pass that simplifies <code>identity_keys</code>
+      using a single central question: <em>could an honest verifier later confirm the value belongs
+      to this instance, given just these identity_keys + the user query?</em></li>
+  <li><strong>Stage A normalize+validate:</strong> reviewer patches are filtered to fields that
+      actually exist in the fact's key.</li>
+  <li><strong>Verifier (LLM):</strong> rewritten to value-first contract with two tools
+      (page fetch + web search). 4 modes collapsed into 1 base prompt + 3 short addendums.</li>
+  <li><strong>Audit signals:</strong> verifier now emits <code>instance_evidence</code>,
+      <code>corroborating_url</code>, <code>normalizations_applied</code>; captured into
+      <code>Verified.issues</code> for downstream audit.</li>
+  <li><strong>Smallest-first Stage B wrapper</strong> with per-case timeout so a single hung
+      case can't block the whole run.</li>
+</ul>
+
+<h2>5. Suggested next steps</h2>
+<ul>
+  <li>Wait for the 5 pending cases (largest by size) to finish or time out.</li>
+  <li>Re-run the 20 timeouts with a longer cap (60-90 min) so the headline includes them.</li>
+  <li>Audit the 3 low scorers (&lt;50%): <code>soc-33-3031</code> (33%), <code>soc-27-4012</code>
+      (33%), <code>soc-11-9013</code> (43%) -- check if failures are real misses or spec defects
+      (which the planned publicness classifier would catch upstream).</li>
+  <li>Once stable, ship cleanup-plan bundle #1+#2+#4 from
+      <code>fix/pipeline_cleanup_plan.html</code>.</li>
+</ul>
+
+
+<h2>6. Fact taxonomy across the 50 templates</h2>
+
+<div class="callout info">
+<strong>Total facts: 310</strong> across 50 templates.<br>
+<strong>Total fixed instances:</strong> 714 (the number of value-cells GT-Agent had to fill).<br>
+Discovered facts add an unknown number of additional instances at fill time.
+</div>
+
+<h3>6.1 By refresh tier</h3>
+<table><thead><tr><th>Refresh tier</th><th>Facts (% of total)</th><th>Fixed instances</th></tr></thead><tbody><tr><td>static</td><td>156 (50.3%)</td><td>477</td></tr><tr><td>annual</td><td>5 (1.6%)</td><td>5</td></tr><tr><td>monthly</td><td>12 (3.9%)</td><td>31</td></tr><tr><td>weekly</td><td>9 (2.9%)</td><td>7</td></tr><tr><td>daily</td><td>128 (41.3%)</td><td>194</td></tr></tbody></table>
+
+<h3>6.2 By enumeration</h3>
+<table><thead><tr><th>Enumeration</th><th>Facts (% of total)</th><th>Fixed instances</th></tr></thead><tbody><tr><td>fixed</td><td>195 (62.9%)</td><td>714</td></tr><tr><td>discovered</td><td>115 (37.1%)</td><td>n/a (filled at runtime)</td></tr></tbody></table>
+
+<h3>6.3 Refresh x Enumeration matrix</h3>
+<table><thead><tr><th>Refresh tier</th><th>Fixed facts</th><th>Discovered facts</th><th>Total facts</th></tr></thead><tbody><tr><td>static</td><td>126</td><td>30</td><td>156</td></tr><tr><td>annual</td><td>5</td><td>0</td><td>5</td></tr><tr><td>daily</td><td>46</td><td>82</td><td>128</td></tr><tr><td>monthly</td><td>11</td><td>1</td><td>12</td></tr><tr><td>weekly</td><td>7</td><td>2</td><td>9</td></tr></tbody></table>
+
+<h3>6.4 Per-case breakdown</h3>
+<table><thead><tr><th>Case</th><th>Facts</th><th>Static</th><th>Need refresh</th><th>Fixed (facts)</th><th>Discovered (facts)</th><th>Fixed instances</th></tr></thead><tbody><tr><td>soc-17-2071.00_task-1364_v2</td><td>20</td><td>0</td><td>20</td><td>2</td><td>18</td><td>12</td></tr><tr><td>soc-11-3031.03_task-15674_v1</td><td>18</td><td>6</td><td>12</td><td>6</td><td>12</td><td>10</td></tr><tr><td>soc-29-1229.05_task-17217_v1</td><td>16</td><td>0</td><td>16</td><td>4</td><td>12</td><td>4</td></tr><tr><td>soc-11-3051.00_task-21337_v2</td><td>13</td><td>10</td><td>3</td><td>8</td><td>5</td><td>11</td></tr><tr><td>soc-13-2022.00_task-21539_v2</td><td>10</td><td>0</td><td>10</td><td>2</td><td>8</td><td>2</td></tr><tr><td>soc-15-2011.00_task-3510_v2</td><td>10</td><td>0</td><td>10</td><td>1</td><td>9</td><td>3</td></tr><tr><td>soc-25-1126.00_task-6378_v1</td><td>9</td><td>6</td><td>3</td><td>9</td><td>0</td><td>90</td></tr><tr><td>soc-13-1081.01_task-20003_v2</td><td>8</td><td>7</td><td>1</td><td>7</td><td>1</td><td>56</td></tr><tr><td>soc-33-3021.00_task-23029_v1</td><td>8</td><td>7</td><td>1</td><td>8</td><td>0</td><td>48</td></tr><tr><td>soc-41-3031.00_task-23211_v2</td><td>8</td><td>0</td><td>8</td><td>6</td><td>2</td><td>10</td></tr><tr><td>soc-11-9013.00_task-21387_v1</td><td>7</td><td>0</td><td>7</td><td>6</td><td>1</td><td>6</td></tr><tr><td>soc-11-9161.00_task-7274_v1</td><td>7</td><td>0</td><td>7</td><td>7</td><td>0</td><td>34</td></tr><tr><td>soc-13-1075.00_task-18896_v2</td><td>7</td><td>0</td><td>7</td><td>4</td><td>3</td><td>11</td></tr><tr><td>soc-17-2199.03_task-18156_v1</td><td>7</td><td>7</td><td>0</td><td>6</td><td>1</td><td>6</td></tr><tr><td>soc-19-2043.00_task-9106_v2</td><td>7</td><td>7</td><td>0</td><td>7</td><td>0</td><td>8</td></tr><tr><td>soc-19-3011.00_task-7541_v2</td><td>7</td><td>5</td><td>2</td><td>7</td><td>0</td><td>22</td></tr><tr><td>soc-19-4012.01_task-20875_v2</td><td>7</td><td>3</td><td>4</td><td>4</td><td>3</td><td>4</td></tr><tr><td>soc-33-1021.00_task-22923_v2</td><td>7</td><td>4</td><td>3</td><td>5</td><td>2</td><td>5</td></tr><tr><td>soc-41-4011.07_task-17655_v1</td><td>7</td><td>7</td><td>0</td><td>7</td><td>0</td><td>11</td></tr><tr><td>soc-51-8013.00_task-23619_v1</td><td>7</td><td>7</td><td>0</td><td>4</td><td>3</td><td>14</td></tr><tr><td>soc-11-9141.00_task-7228_v1</td><td>6</td><td>6</td><td>0</td><td>6</td><td>0</td><td>6</td></tr><tr><td>soc-13-2041.00_task-1259_v1</td><td>6</td><td>0</td><td>6</td><td>2</td><td>4</td><td>2</td></tr><tr><td>soc-13-2051.00_task-21580_v1</td><td>6</td><td>0</td><td>6</td><td>2</td><td>4</td><td>2</td></tr><tr><td>soc-17-2051.00_task-147_v2</td><td>6</td><td>6</td><td>0</td><td>6</td><td>0</td><td>16</td></tr><tr><td>soc-17-2171.00_task-3579_v2</td><td>6</td><td>4</td><td>2</td><td>6</td><td>0</td><td>13</td></tr><tr><td>soc-33-1091.00_task-22959_v2</td><td>6</td><td>1</td><td>5</td><td>2</td><td>4</td><td>2</td></tr><tr><td>soc-33-3031.00_task-7925_v2</td><td>6</td><td>6</td><td>0</td><td>3</td><td>3</td><td>3</td></tr><tr><td>soc-13-1161.01_task-16187_v1</td><td>5</td><td>5</td><td>0</td><td>4</td><td>1</td><td>4</td></tr><tr><td>soc-17-2199.11_task-16572_v1</td><td>5</td><td>5</td><td>0</td><td>3</td><td>2</td><td>3</td></tr><tr><td>soc-21-1021.00_task-254_v2</td><td>5</td><td>5</td><td>0</td><td>5</td><td>0</td><td>9</td></tr><tr><td>soc-27-4012.00_task-18653_v1</td><td>5</td><td>5</td><td>0</td><td>5</td><td>0</td><td>5</td></tr><tr><td>soc-11-1011.00_task-8834_v1</td><td>4</td><td>0</td><td>4</td><td>4</td><td>0</td><td>16</td></tr><tr><td>soc-11-3121.00_task-1000_v2</td><td>4</td><td>0</td><td>4</td><td>3</td><td>1</td><td>13</td></tr><tr><td>soc-17-2081.00_task-19624_v2</td><td>4</td><td>4</td><td>0</td><td>3</td><td>1</td><td>144</td></tr><tr><td>soc-27-2012.03_task-7669_v1</td><td>4</td><td>4</td><td>0</td><td>0</td><td>4</td><td>0</td></tr><tr><td>soc-47-1011.03_task-17738_v2</td><td>4</td><td>3</td><td>1</td><td>2</td><td>2</td><td>2</td></tr><tr><td>soc-47-5032.00_task-9910_v2</td><td>4</td><td>4</td><td>0</td><td>4</td><td>0</td><td>4</td></tr><tr><td>soc-53-6041.00_task-8647_v2</td><td>4</td><td>4</td><td>0</td><td>4</td><td>0</td><td>4</td></tr><tr><td>soc-19-1041.00_task-15215_v1</td><td>3</td><td>3</td><td>0</td><td>3</td><td>0</td><td>3</td></tr><tr><td>soc-19-2042.00_task-19772_v1</td><td>3</td><td>3</td><td>0</td><td>3</td><td>0</td><td>18</td></tr><tr><td>soc-29-1141.00_task-1861_v2</td><td>3</td><td>1</td><td>2</td><td>1</td><td>2</td><td>3</td></tr><tr><td>soc-29-1141.03_task-18339_v2</td><td>3</td><td>0</td><td>3</td><td>3</td><td>0</td><td>3</td></tr><tr><td>soc-37-1011.00_task-9535_v2</td><td>3</td><td>2</td><td>1</td><td>2</td><td>1</td><td>12</td></tr><tr><td>soc-41-1011.00_task-670_v1</td><td>3</td><td>3</td><td>0</td><td>1</td><td>2</td><td>8</td></tr><tr><td>soc-53-1044.00_task-23698_v1</td><td>3</td><td>3</td><td>0</td><td>0</td><td>3</td><td>0</td></tr><tr><td>soc-13-2054.00_task-21614_v1</td><td>2</td><td>0</td><td>2</td><td>2</td><td>0</td><td>20</td></tr><tr><td>soc-25-9031.00_task-22450_v2</td><td>2</td><td>0</td><td>2</td><td>2</td><td>0</td><td>20</td></tr><tr><td>soc-47-4011.01_task-18079_v1</td><td>2</td><td>2</td><td>0</td><td>2</td><td>0</td><td>6</td></tr><tr><td>soc-51-9071.00_task-23627_v2</td><td>2</td><td>0</td><td>2</td><td>2</td><td>0</td><td>6</td></tr><tr><td>soc-15-2051.02_task-16279_v2</td><td>1</td><td>1</td><td>0</td><td>0</td><td>1</td><td>0</td></tr></tbody></table>
+
+<h2>7. Refresh readiness - Tier A/B + verification</h2>
+<p class="small">Scope: the 111 dynamic (non-static) instances in the
+<strong>completed/ok cases only</strong> (the 20 timeouts + 5 pending produced no
+gold yet, so their dynamic facts are not counted here). "Verified" below is the
+<em>build-time</em> verifier (<code>verified</code> flag in the gold), not the
+refresh-time replay gate.</p>
+
+<div class="stat-grid">
+  <div class="stat-card"><div class="label">Dynamic instances (ok cases)</div><div class="value">111</div></div>
+  <div class="stat-card green"><div class="label">Build-time verified</div><div class="value">88 (79.3%)</div></div>
+  <div class="stat-card red"><div class="label">Verification failed</div><div class="value">23 (20.7%)</div></div>
+  <div class="stat-card"><div class="label">Tier A / Tier B</div><div class="value">100% / 0%</div></div>
+</div>
+
+<h3>7.1 Tier split (resolved skill per instance)</h3>
+<table><thead><tr><th>Refresh tier</th><th>Instances</th><th>Share</th><th>Build-time verified</th></tr></thead><tbody>
+<tr class="band-100"><td>Tier A - deterministic (parser)</td><td>111</td><td>100.0%</td><td>88/111 (79.3%)</td></tr>
+<tr class="band-low"><td>Tier B - llm_playbook</td><td>0</td><td>0.0%</td><td>n/a</td></tr>
+</tbody></table>
+<p class="small">Source-level confirmation: all 118 skills in
+<code>refresh/skills/_proposals/</code> are <code>deterministic</code> (Tier A);
+the only Tier B (<code>llm_playbook</code>) skill is the approved
+<code>vendor_catalog.json</code>, which matched no evidence host in the completed
+cases. The proposal writer never emits Tier B today.</p>
+
+<h3>7.2 Dynamic instances by cadence</h3>
+<table><thead><tr><th>Cadence</th><th>Instances</th></tr></thead><tbody>
+<tr><td>daily</td><td>94</td></tr>
+<tr><td>weekly</td><td>7</td></tr>
+<tr><td>monthly</td><td>7</td></tr>
+<tr><td>annual</td><td>3</td></tr>
+</tbody></table>
+
+<h3>7.3 Tier A verification flow (current - fully automated, no human gate)</h3>
+<p class="small">Tier A facts pass through an LLM build-time value check (Gate 1)
+and then the automated fetcher test in <code>consolidate.py</code> (Gate 2 offline
+replay + Gate 3 live fetch), which consolidates passing fetchers for eval-time
+reuse. There is <strong>no human review gate</strong> in this path.</p>
+
+<div class="mermaid">
+flowchart TD
+    SB["Stage B fill (GT-Agent)<br/>produces value + frozen snapshot + evidence_url"]
+    SB --> G1
+
+    subgraph GATE1["Gate 1 - Build-time verifier (LLM, value-first)"]
+      G1["fetch evidence page + web search<br/>re-derive value, confirm it belongs to this identity"]
+      G1 --> G1D{"value reproduced<br/>within tolerance?"}
+    end
+    G1D -- yes --> V1["verified = true<br/>(88/111 = 79.3% here)"]
+    G1D -- "no (JS-obfuscated / anti-scrape)" --> F1["verified = false<br/>(23/111 = 20.7% here)"]
+
+    SB --> PW["proposal_writer emits parser.py<br/>(_proposals/&lt;case&gt;__&lt;fact&gt;/)"]
+    PW --> G2
+
+    subgraph CONS["consolidate.py - automated fetcher test (no human gate)"]
+      G2["Gate 2 OFFLINE: parse(frozen_snapshot, key)"]
+      G2 --> G2D{"== frozen value<br/>(within tol)?"}
+      G3["Gate 3 LIVE: generated fetch()<br/>retrieves evidence_url, re-parses"]
+      G3 --> G3D{"plausible value<br/>returned?"}
+    end
+    G2D -- "reproduced (61/111)" --> R2["instance correct (Gate 2)"]
+    G2D -- "no (50/111)" --> X2["instance UNRESOLVED"]
+    G3D -- "ok (47/111)" --> L1["eval-time fetch works (Gate 3)"]
+    G3D -- "no (64/111)" --> L0["OFFLINE_ONLY / needs Tier B / rendered fetch"]
+
+    R2 --> DEC{"qualified?<br/>correct AND live<br/>for &ge; 1 instance"}
+    L1 --> DEC
+    DEC -- yes --> PROMO["CONSOLIDATE (dedup by source_id)<br/>write run_dir/skills/ + run_dir/fetchers/<br/>26 fetchers, 27 facts"]
+    DEC -- no --> UNR["fact UNRESOLVED (53 facts)"]
+
+    classDef pass fill:#d1fae5,stroke:#047857;
+    classDef fail fill:#fee2e2,stroke:#b91c1c;
+    class V1,R2,L1,PROMO pass;
+    class F1,X2,L0,UNR fail;
+</div>
+
+<table><thead><tr><th>Gate</th><th>Type</th><th>Where</th><th>Output</th><th>Run on this batch?</th></tr></thead><tbody>
+<tr><td>1. Build-time verifier</td><td>LLM (page fetch + web search), value-first</td><td><code>fill_loop</code> / verifier</td><td><code>verified</code> flag in gold</td><td>Yes - 79.3% pass</td></tr>
+<tr><td>2. Closed-loop parser verify (offline)</td><td>Deterministic (re-run parser on frozen snapshot)</td><td><code>consolidate.py</code></td><td>offline_reproduced per instance</td><td><strong>Yes - 61/111 (55.0%)</strong></td></tr>
+<tr><td>3. Live-fetch test (eval-time)</td><td>Deterministic (generated <code>fetch()</code> retrieves URL, re-parses)</td><td><code>consolidate.py</code></td><td>live_ok per instance</td><td><strong>Yes - 47/111 (42.3%)</strong></td></tr>
+</tbody></table>
+
+<div class="callout warn">
+<strong>The build-time LLM verifier (Gate 1) is not the same as a working fetcher.</strong>
+Its 79.3% is a point-in-time value audit; it never runs the parser. Some pages it
+marked <em>failed</em> (e.g. POET cash bids in <code>soc-11-9013</code>, value hidden
+behind <code>displayNumber(...)</code>) are actually handled by the deterministic
+parser, which de-obfuscates the <code>NoScrapeOffset</code> and reproduces 3/3 offline.
+So Gate 1 pass/fail and fetcher capability diverge in both directions.
+</div>
+
+<h3>7.4 Tier A fetcher test + consolidation (automated, no human gate)</h3>
+<p class="small">New stage <code>custom_benchmark/refresh/consolidate.py</code>. For every
+dynamic instance it (1) replays <code>parse(frozen_snapshot)</code> offline and
+(2) runs a generated <code>fetch()</code> that retrieves the live <code>evidence_url</code>
+and re-parses. <strong>Consolidation gate:</strong> per fact, the fetcher is promoted
+(deduped by <code>source_id</code>) only if &ge; 1 instance is BOTH offline-correct
+(Gate 2) AND live-ok (Gate 3) - i.e. the fetcher actually works at eval time.
+Everything else is marked <code>OFFLINE_ONLY</code> (parser correct, live fetch broken)
+or <code>UNRESOLVED</code>.</p>
+
+<div class="stat-grid">
+  <div class="stat-card"><div class="label">Dynamic instances tested</div><div class="value">111</div></div>
+  <div class="stat-card"><div class="label">Offline correct (Gate 2)</div><div class="value">61 (55.0%)</div></div>
+  <div class="stat-card green"><div class="label">Qualified - live works (Gate 2+3)</div><div class="value">47 (42.3%)</div></div>
+  <div class="stat-card green"><div class="label">Fetchers consolidated</div><div class="value">26</div></div>
+</div>
+
+<table><thead><tr><th>Outcome</th><th>Count</th><th>Notes</th></tr></thead><tbody>
+<tr class="band-100"><td>Fetchers consolidated (source_id)</td><td>26</td><td>&ge; 1 correct-and-live instance; written to <code>skills/</code> + <code>fetchers/</code></td></tr>
+<tr class="band-low"><td>Fetchers unresolved</td><td>13</td><td>no instance both correct and live</td></tr>
+<tr class="band-80"><td>Facts consolidated</td><td>27 / 80</td><td>&ge; 1 qualified instance</td></tr>
+<tr class="band-low"><td>Facts unresolved</td><td>53 / 80</td><td>parser correct but live fetch broken, or no Tier A path (anti-scrape)</td></tr>
+</tbody></table>
+
+<div class="callout ok">
+<strong>Consolidated output (deliverable for eval-time reuse):</strong>
+<code>results/run_20260616/skills/&lt;source_id&gt;.json</code> (26) +
+<code>results/run_20260616/fetchers/&lt;source_id&gt;.py</code> (26, parser + generated
+<code>fetch()</code>), with a full per-instance record in
+<code>results/run_20260616/consolidation_manifest.json</code>. Run with
+<code>python -m custom_benchmark.refresh.consolidate --run-dir results/run_20260616</code>.
+</div>
+
+<div class="callout info">
+<strong>Why the gate is correct-and-live, not offline-only:</strong> a fetcher exists to be
+run by the refresh agent at evaluation time, so it must actually fetch. Gate 2 (offline,
+55%) proves the parser is correct; Gate 3 (live, 42%) proves it still works against the
+real URL. We consolidate on the intersection (47/111). In this run every live-ok instance
+was also offline-correct, so the intersection equals the live set - but requiring both keeps
+us safe against a live fetch that returns a plausible-but-wrong value.
+</div>
+
+<h3>7.5 Gate 2 vs Gate 3 - what the two fetcher tests mean</h3>
+<p class="small">Both gates run in <code>consolidate.py</code> and use the <strong>same
+parser</strong>, but they test different things.</p>
+<table><thead><tr><th></th><th>Gate 2 - Offline replay</th><th>Gate 3 - Live fetch</th></tr></thead><tbody>
+<tr><td>Input HTML</td><td>the <strong>frozen snapshot</strong> saved at build time (<code>snippet</code> in the gold)</td><td>the <strong>live page</strong> fetched fresh from <code>evidence_url</code> now</td></tr>
+<tr><td>Call</td><td><code>parse(frozen_snapshot, key)</code></td><td>generated <code>fetch()</code> &rarr; <code>get_text(url)</code> &rarr; <code>parse(live_html, key)</code></td></tr>
+<tr><td>Pass condition</td><td>output <strong>equals the frozen value</strong> (within tolerance)</td><td>output is a <strong>non-null, plausible value</strong> (not required to equal the old value)</td></tr>
+<tr><td>What it proves</td><td>the parser <strong>correctly extracts</strong> the value - <em>producer == product</em></td><td>the fetcher <strong>still works end-to-end</strong> at eval time (URL reachable + page shape parseable)</td></tr>
+<tr><td>Network</td><td>none (deterministic)</td><td>yes (can be slow / flaky / blocked)</td></tr>
+<tr><td>This run</td><td>61/111 (55.0%)</td><td>47/111 (42.3%)</td></tr>
+</tbody></table>
+<ul>
+  <li><strong>Gate 2 passes, Gate 3 fails</strong> - parser is correct on saved HTML, but the live URL now 403s / redirects / changed markup. This is the 61&rarr;47 gap: the parser is right but live retrieval is broken.</li>
+  <li><strong>Gate 3 deliberately does NOT require equality</strong> - the data is dynamic (a diesel price or corn future will have moved since build time), so Gate 3 only asks for a plausible value of the right kind; Gate 2 requires equality because the snapshot is frozen.</li>
+  <li><strong>Consolidation is gated on Gate 2</strong> (the trustworthy deterministic signal). Gate 3 is recorded per instance as the eval-time readiness flag - which consolidated fetchers will actually return data when the refresh agent runs them.</li>
+</ul>
+<p class="small"><strong>One line:</strong> Gate 2 = "is the parser correct?"; Gate 3 = "does the fetcher still work live?"</p>
+
+<h2>8. Rerun of unfinished cases (2h cap + instance batching)</h2>
+<p class="small">The 21 cases left unfinished by the original 30-min cap were re-run with
+<code>--per-case-timeout 7200</code> (2h), the new <strong>instance-batching</strong>
+optimization (<code>--fixed-batch-size 12</code>: one Copilot session fills up to 12
+instances of a fact instead of one session per instance), and <code>--max-concurrent 4</code>.
+Snapshot generated 2026-06-18.</p>
+
+<div class="stat-grid">
+  <div class="stat-card green"><div class="label">Recovered (now complete)</div><div class="value">13 / 21</div></div>
+  <div class="stat-card"><div class="label">Re-running (transient blip)</div><div class="value">8</div></div>
+  <div class="stat-card green"><div class="label">Recovered filled inst.</div><div class="value">180</div></div>
+  <div class="stat-card"><div class="label">Recovered genuine null</div><div class="value">77</div></div>
+</div>
+
+<h3>8.1 Recovered cases (were timeouts under the 30-min cap)</h3>
+<p class="small">Many genuinely needed &gt; 30 min, so the 2h cap is what let them finish.
+<code>null</code> = instances the agent faithfully left null (no authoritative value exists;
+these are reported by the new end-of-run faithful-null reminder, not hidden).</p>
+<table><thead><tr><th>Case</th><th>Elapsed (min)</th><th>Filled</th><th>Verified</th><th>Null</th></tr></thead><tbody>
+<tr class="band-80"><td>soc-17-2199.03_task-18156_v1</td><td>41.3</td><td>9</td><td>0</td><td>6</td></tr>
+<tr class="band-80"><td>soc-19-3011.00_task-7541_v2</td><td>39.8</td><td>22</td><td>1</td><td>20</td></tr>
+<tr class="band-80"><td>soc-33-1021.00_task-22923_v2</td><td>37.7</td><td>5</td><td>0</td><td>5</td></tr>
+<tr class="band-100"><td>soc-33-1091.00_task-22959_v2</td><td>32.8</td><td>31</td><td>26</td><td>0</td></tr>
+<tr class="band-80"><td>soc-41-4011.07_task-17655_v1</td><td>29.7</td><td>11</td><td>1</td><td>8</td></tr>
+<tr class="band-100"><td>soc-17-2051.00_task-147_v2</td><td>29.3</td><td>16</td><td>12</td><td>2</td></tr>
+<tr class="band-80"><td>soc-17-2199.11_task-16572_v1</td><td>28.3</td><td>11</td><td>0</td><td>3</td></tr>
+<tr class="band-80"><td>soc-17-2171.00_task-3579_v2</td><td>26.2</td><td>13</td><td>7</td><td>6</td></tr>
+<tr class="band-50"><td>soc-11-3121.00_task-1000_v2</td><td>22.7</td><td>13</td><td>3</td><td>10</td></tr>
+<tr class="band-100"><td>soc-37-1011.00_task-9535_v2</td><td>22.5</td><td>12</td><td>10</td><td>2</td></tr>
+<tr class="band-100"><td>soc-25-9031.00_task-22450_v2</td><td>17.8</td><td>20</td><td>18</td><td>0</td></tr>
+<tr class="band-80"><td>soc-47-4011.01_task-18079_v1</td><td>12.4</td><td>6</td><td>0</td><td>6</td></tr>
+<tr class="band-80"><td>soc-13-1075.00_task-18896_v2</td><td>4.9</td><td>11</td><td>0</td><td>9</td></tr>
+</tbody></table>
+
+<h3>8.2 The 8 re-running cases (transient Copilot auth blip - NOT a code bug)</h3>
+<p class="small">During the first rerun, a network/OAuth blip in the Copilot CLI
+(<code>Authentication failed: Failed to fetch OAuth user login: TypeError: fetch failed</code>)
+hit a window of cases, crashing them fast (32-69s) into empty gold (filled=0). Discovered-heavy
+cases (which do NOT use the batch change) crashed too, confirming the cause is infra, not the
+optimization. They were re-launched with <code>--force</code> once connectivity returned.</p>
+<table><thead><tr><th>Re-running case</th><th>Size</th></tr></thead><tbody>
+<tr><td>soc-51-8013.00_task-23619_v1</td><td>14 fixed + 3 discovered</td></tr>
+<tr><td>soc-11-9161.00_task-7274_v1</td><td>34 fixed (was 519 min in the original analysis)</td></tr>
+<tr><td>soc-11-3051.00_task-21337_v2</td><td>11 fixed + 5 discovered</td></tr>
+<tr><td>soc-13-2022.00_task-21539_v2</td><td>2 fixed + 8 discovered</td></tr>
+<tr><td>soc-15-2011.00_task-3510_v2</td><td>3 fixed + 9 discovered</td></tr>
+<tr><td>soc-33-3021.00_task-23029_v1</td><td>48 fixed</td></tr>
+<tr><td>soc-13-1081.01_task-20003_v2</td><td>56 fixed</td></tr>
+<tr><td>soc-29-1229.05_task-17217_v1</td><td>4 fixed + 12 discovered</td></tr>
+</tbody></table>
+
+<div class="callout info">
+<strong>Instance-batching change.</strong> A FIXED fact's instances are now filled in one
+session per batch of 12 (e.g. <code>soc-11-9161</code>: 34 sessions &rarr; 7), with the
+session timeout scaled to the batch size. Two safeguards: every requested key is reconciled to
+exactly one instance (a dropped key becomes an explicit null, never silently lost), and retries
+are monotonic (a flaky re-run can't erase an already-found value). A faithful-null reminder
+prints at the end of every run so genuinely-null instances are surfaced, not backfilled.
+</div>
+
+<div class="callout warn">
+<strong>Quality flag:</strong> several recovered cases are <code>filled &gt; 0</code> but
+<code>verified = 0</code> (e.g. <code>soc-17-2199.03</code>, <code>soc-33-1021</code>,
+<code>soc-13-1075</code>, <code>soc-47-4011.01</code>). The verifier rejected every filled value
+- worth an audit to tell real misses from verifier strictness before these go into the gold.
+</div>
+
+<p class="small">Owner: pipeline maintainer - Run continues in the background.</p>
+</body>
+</html>

@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent-Generated Benchmark Pipeline — Experience, Obstacles & Fixes</title>
+<style>
+  :root { --blue:#0366d6; --green:#1a7f37; --red:#cf222e; --amber:#d4a72c; --purple:#8250df; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, "Segoe UI", "Microsoft YaHei", Roboto, sans-serif; max-width: 1080px; margin: 0 auto; padding: 2.5em 1.5em 5em; color: #1f2328; line-height: 1.65; }
+  h1 { border-bottom: 3px solid var(--blue); padding-bottom: .35em; font-size: 2em; }
+  h2 { margin-top: 2.4em; border-bottom: 1px solid #d8dee4; padding-bottom: .25em; }
+  h3 { margin-top: 1.7em; color: #24292e; }
+  h4 { margin-top: 1.2em; color: #3a4149; }
+  code { font-family: "Cascadia Code", Consolas, monospace; background: #f0f3f6; padding: 1px 6px; border-radius: 4px; font-size: 90%; }
+  pre { font-family: "Cascadia Code", Consolas, monospace; background: #f6f8fa; padding: .9em 1.1em; border-radius: 8px; overflow-x: auto; font-size: 12.5px; line-height: 1.5; white-space: pre; }
+  table { border-collapse: collapse; width: 100%; margin: 1em 0; font-size: 13.8px; }
+  th, td { border: 1px solid #d0d7de; padding: 7px 11px; text-align: left; vertical-align: top; }
+  th { background: #f6f8fa; }
+  .meta { color: #57606a; font-size: 13.5px; }
+  .lede { font-size: 15.5px; }
+  .key   { background: #dafbe1; border-left: 4px solid var(--green); padding: .8em 1.1em; margin: 1em 0; border-radius: 5px; }
+  .info  { background: #ddf4ff; border-left: 4px solid var(--blue); padding: .8em 1.1em; margin: 1em 0; border-radius: 5px; }
+  .warn  { background: #fff8c5; border-left: 4px solid var(--amber); padding: .8em 1.1em; margin: 1em 0; border-radius: 5px; }
+  .risk  { background: #ffebe9; border-left: 4px solid var(--red); padding: .8em 1.1em; margin: 1em 0; border-radius: 5px; }
+  .badge { display: inline-block; padding: 2px 9px; border-radius: 11px; font-size: 11.5px; font-weight: 700; letter-spacing:.02em; }
+  .b-q2f { background:#ddf4ff; color:#0969da; } .b-gt { background:#fbe9ff; color:#8250df; }
+  .b-eval{ background:#fff1e5; color:#bc4c00; } .b-fix { background:#dafbe1; color:#1a7f37; }
+  .b-prob{ background:#ffebe9; color:#82071e; }
+  .pipeline { background:#0d1117; color:#c9d1d9; padding:1.1em 1.2em; border-radius:8px; font-family:"Cascadia Code",Consolas,monospace; font-size:12.5px; white-space:pre; overflow-x:auto; line-height:1.45; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:.9em; margin:1.2em 0; }
+  .stat { background:#f6f8fa; border:1px solid #d0d7de; border-radius:10px; padding:1em 1.1em; }
+  .stat .n { font-size:26px; font-weight:800; color:var(--blue); line-height:1.1; }
+  .stat .l { font-size:11.5px; color:#57606a; text-transform:uppercase; letter-spacing:.05em; margin-top:.3em; }
+  ul.tight li, ol.tight li { margin:.28em 0; }
+  .toc { background:#f6f8fa; border:1px solid #d8dee4; border-radius:10px; padding:1em 1.4em; }
+  .toc a { color:var(--blue); text-decoration:none; } .toc a:hover { text-decoration:underline; }
+  .tag { font-size:11px; font-weight:700; padding:1px 7px; border-radius:6px; }
+  .t-root { background:#ffe3e3; color:#b42318; } .t-fix { background:#d3f9d8; color:#1a7f37; }
+  hr { border:none; border-top:1px solid #e1e4e8; margin:2.4em 0; }
+  footer { margin-top:3em; color:#8b949e; font-size:12.5px; border-top:1px solid #e1e4e8; padding-top:1em; }
+</style>
+</head>
+<body>
+
+<h1>Building an Agent-Generated Benchmark Pipeline</h1>
+<p class="meta">Consolidated engineering experience &middot; Microsoft internship (Web Search / Excel-Copilot research) &middot; <code>custom_benchmark/</code> &mdash; Query2Facts &rarr; Ground-Truth Agent &rarr; Log2Answer</p>
+
+<p class="lede">
+This is a write-up of <b>what we built, what broke, and how we fixed it</b> while constructing a benchmark
+<i>whose ground truth is produced by LLM agents that browse the live web</i> &mdash; not by human annotators.
+The headline lesson: <b>the moment both the value-producer and the value-checker are non-deterministic agents reading a changing world,
+"trust" stops being the currency. The currency becomes <u>reproducible, identity-anchored evidence</u>.</b>
+Everything below is engineering fallout from that one shift.
+</p>
+
+<div class="grid">
+  <div class="stat"><div class="n">3</div><div class="l">pipeline stages</div></div>
+  <div class="stat"><div class="n">10</div><div class="l">starter cases</div></div>
+  <div class="stat"><div class="n">~226</div><div class="l">fact instances</div></div>
+  <div class="stat"><div class="n">9</div><div class="l">distinct obstacles solved</div></div>
+</div>
+
+<div class="toc">
+<b>Contents</b>
+<ol class="tight">
+  <li><a href="#what">What the pipeline is (3 stages)</a></li>
+  <li><a href="#summary">Obstacle scoreboard (quick table)</a></li>
+  <li><a href="#o1">Obstacle 1 — Copilot SDK BYOK streaming hang</a></li>
+  <li><a href="#o2">Obstacle 2 — Evidence reproducibility (the core insight)</a></li>
+  <li><a href="#o3">Obstacle 3 — Verifier blind spots → 3 routing strategies</a></li>
+  <li><a href="#o4">Obstacle 4 — Fact identity model (minimal sufficient key)</a></li>
+  <li><a href="#o5">Obstacle 5 — Log2Answer extractor: 4-layer distortion</a></li>
+  <li><a href="#o6">Obstacle 6 — A poisoned case (synthetic UPCs)</a></li>
+  <li><a href="#o7">Obstacle 7 — Refreshing dynamic facts at eval time</a></li>
+  <li><a href="#o8">Obstacle 8 — Repair loop for failed verification</a></li>
+  <li><a href="#o9">Obstacle 9 — Throughput / parallelization</a></li>
+  <li><a href="#takeaways">Transferable takeaways (for interviews)</a></li>
+</ol>
+</div>
+
+<h2 id="what">1. What the pipeline is</h2>
+
+<p>
+Goal: turn an <b>Excel-Copilot task</b> (a natural-language requirement + a workbook dump) into a
+<b>frozen, auditable ground-truth set</b> we can grade any agent against. Three stages, chained so each
+produces a stable, versioned schema for the next:
+</p>
+
+<div class="pipeline">  case/  (excel_copilot_web_search_requirement.md  +  excel_dump.txt)
+        │
+        ▼   <span style="color:#79c0ff">STAGE A — Query2Facts</span>   (1 LLM call / case)
+   Extract the atomic facts that *require the web* and are *uniquely verifiable*.
+   Rules: R1 query asks for it · R2 not already in workbook · R3 verifiable vs an authority.
+   Drop rules X1–X7 (unit constants, definitions, internal policy, derived values…).
+        │
+        ▼   fact_spec_template.json   (schema 0.6 · value=null, evidence_url=null)
+        │
+        ▼   <span style="color:#d2a8ff">STAGE B — Ground-Truth Agent</span>   (N agent sessions / case)
+   dispatcher → TaskBundle[]   (fixed: 1/instance · discovered: 1/fact, agent enumerates)
+   fill_loop  → L3 GT-Agent fills value+url+snippet (≤2 rounds, retries nulls)
+              → L4 Verifier independently re-checks (fetch / binary-parse / corroborate)
+              → L6 Repair re-grounds the failures
+   freeze     → L5 fact_spec_gold.json   (schema 0.7 · per instance: value+url+verified)
+        │
+        ▼   <span style="color:#ffa657">STAGE C — Log2Answer</span>   (1 LLM call / gold instance)
+   Given a graded agent's raw run log, extract what *that* agent answered for each
+   identity, then deterministically compare to gold (numeric tol / case-fold / host suffix).</div>
+
+<div class="info">
+<b>Key architectural choice:</b> every GT-Agent and Verifier call is an <b>isolated GitHub Copilot SDK subprocess session</b>
+— no shared memory, no shared trace. The asymmetry is deliberate: the GT-Agent optimizes <i>recall</i> (find the value),
+the Verifier optimizes <i>precision</i> (independently re-confirm it). That isolation is what makes the gold trustworthy —
+and is also the source of half the obstacles below.
+</div>
+
+<h2 id="summary">2. Obstacle scoreboard</h2>
+
+<table>
+<thead><tr><th>#</th><th>Stage</th><th>Obstacle</th><th>Root cause</th><th>Fix</th></tr></thead>
+<tbody>
+<tr><td>1</td><td><span class="badge b-gt">GT</span></td><td>Copilot SDK against our own Azure endpoint <b>hangs ~70s, no error</b></td><td>CLI reads response as streaming SSE; endpoint buffers / doesn't stream</td><td><code>streaming=False</code> + ping-timestamp shim + quota-aware endpoint</td></tr>
+<tr><td>2</td><td><span class="badge b-gt">GT</span></td><td>GT-Agent gets a value the Verifier <b>cannot reproduce</b></td><td>Conflated <i>correct / trustworthy / reproducible</i>; search-only evidence is a transient singleton</td><td>Promote gold currency to <b>reproducibility</b>; 4 reproduction classes × identity gate</td></tr>
+<tr><td>3</td><td><span class="badge b-gt">GT</span></td><td>Verifier false-negatives on binary files & rate-limited sites</td><td>Single <code>web_fetch</code> path returns <code>None</code> on xlsx/pdf; 403s look like failures</td><td>3 routes: binary parse · standard fetch · search corroboration (only when source unreachable)</td></tr>
+<tr><td>4</td><td><span class="badge b-q2f">Q2F</span></td><td>Same key → multiple "valid" values; empty <code>key={}</code> dirty data; eGRID year mismatch</td><td>No formal identity model; hidden <b>time dimension</b> left out of the key</td><td>Model each fact as <code>f(k₁…kₙ)→v</code>; enforce <b>minimal sufficient key</b>; refresh = part of identity</td></tr>
+<tr><td>5</td><td><span class="badge b-eval">Eval</span></td><td>A value appears 5–10× in a 180KB log; which one did the agent adopt?</td><td>4-layer distortion chain; agent self-poisons by putting guesses into search queries</td><td>LLM extractor w/ alias resolution + adoption heuristics + cross-layer sanity check + confidence</td></tr>
+<tr><td>6</td><td><span class="badge b-q2f">Q2F</span></td><td>One case scored 34% — by far the worst</td><td>Workbook used <b>synthetic UPCs</b> (10/12 fail check digit); spec froze fakes as hard keys</td><td>Deterministic UPC check-digit audit → diagnose <b>unsatisfiable query + spec defect</b>; drop/rebuild case</td></tr>
+<tr><td>7</td><td><span class="badge b-gt">GT</span></td><td>Some facts drift between build time and eval time</td><td>Annual/weekly/daily values change after freeze</td><td>Portable refresh pipeline: Tier A deterministic fetchers w/ drift guard; Tier B playbooks deferred</td></tr>
+<tr><td>8</td><td><span class="badge b-gt">GT</span></td><td>Failed verifications need recovery without inventing values</td><td>Mixed failure causes (identity / inaccessible / not-found)</td><td>Layer-6 Repair: triage → identity re-search + majority vote → escalate, never fabricate</td></tr>
+<tr><td>9</td><td><span class="badge b-gt">GT</span></td><td>10-case batch takes <b>5.95 h</b> serially</td><td>One Copilot subprocess per fact, strictly awaited in sequence</td><td>Measure-first <code>--max-concurrent</code> gradual rollout (don't trust the "subprocess is heavy" assumption)</td></tr>
+</tbody>
+</table>
+
+<hr>
+
+<h2 id="o1">Obstacle 1 — Copilot SDK BYOK: 70-second silent hang <span class="badge b-gt">Stage B</span></h2>
+
+<p>We wanted the GT-Agent / Verifier sessions to run on our <b>team's own Azure OpenAI endpoint</b> (BYOK) instead of the
+GitHub backend, to dodge rate limits. The SDK <i>did</i> support it via <code>ProviderConfig</code> — but every request
+<b>hung for ~70 seconds and then returned nothing: no response, no error, no retry</b>.</p>
+
+<h4>How we cornered it (elimination, then a mock server)</h4>
+<table>
+<thead><tr><th>Hypothesis</th><th>Test</th><th>Result</th></tr></thead>
+<tbody>
+<tr><td>Bad creds / endpoint / api-version</td><td>Python <code>requests.post</code> straight to the deployment</td><td>200 in &lt;1s ✅ — ruled out</td></tr>
+<tr><td>node's HTTP stack (undici)</td><td>node built-in <code>fetch</code> replicating the CLI request</td><td>200 / 2.2s ✅ — ruled out</td></tr>
+<tr><td>Request body too big (58KB prompt + 17 tools)</td><td>node sends 117KB body</td><td>Fast 429, not a hang — ruled out</td></tr>
+<tr><td>SDK wrapper bug</td><td>raw CLI <code>-p</code></td><td><b>Also hangs</b> → not the SDK</td></tr>
+</tbody>
+</table>
+
+<p>The breakthrough was pointing <code>COPILOT_PROVIDER_BASE_URL</code> at a <b>local mock server</b> to capture the real
+outbound request. The request was <i>perfect</i> — correct path, correct OpenAI JS client, valid chat-completions body.
+The only difference from our working direct calls: the CLI was reading the response as a <b>streaming SSE chunk stream</b>.</p>
+
+<div class="risk">
+<b>Root cause:</b> the CLI defaults to streaming. Our Azure endpoint (or its front gateway) <b>buffers the whole response
+instead of streaming it</b>, so the CLI waits forever for SSE chunks that never arrive → a silent ~70s hang.
+A pure "client expects SSE vs endpoint doesn't stream" mismatch.
+</div>
+
+<div class="key">
+<b>Fix:</b> <span class="tag t-fix">FIX</span> turn streaming off — <code>streaming=False</code> in the SDK / <code>--stream off</code> on the CLI.
+Both paths immediately returned <code>BYOK_OK</code>. Two more papercuts fixed alongside:
+<ul class="tight">
+<li><b>Secondary bug:</b> the bundled CLI returns the <code>ping</code> timestamp as an ISO-8601 <i>string</i>, but the Python SDK
+does <code>int(timestamp)</code> and crashes at <code>start()</code>. Monkeypatched <code>PingResponse.from_dict</code> to fall back to
+<code>datetime.fromisoformat</code>.</li>
+<li><b>Quota:</b> the 58KB system prompt 429'd instantly on a low-quota endpoint — had to route to a quota'd region
+(<code>dialresearchcanadaeast</code>).</li>
+</ul>
+</div>
+
+<h2 id="o2">Obstacle 2 — "GT got the value, Verifier can't reproduce it" <span class="badge b-gt">Stage B</span></h2>
+
+<p>This was the conceptual heart of the whole project. When you build a benchmark with agents, the answer is fetched
+<b>live</b> by a non-deterministic agent from a <b>changing world</b>. So we kept hitting cases where the GT-Agent confidently
+returned a value and the independent Verifier <b>could not get it back</b>. Are those bugs? Sometimes — but not always.</p>
+
+<div class="key">
+<b>The insight that unblocked everything:</b> three concepts had been silently conflated:
+<table style="margin-top:.6em">
+<thead><tr><th>Concept</th><th>Means</th><th>Nature</th></tr></thead>
+<tbody>
+<tr><td><b>correct</b></td><td>the value is objectively right</td><td>a fact about the world</td></tr>
+<tr><td><b>trustworthy</b></td><td>we have reason to believe it now</td><td>a present, subjective judgment</td></tr>
+<tr><td><b>reproducible</b></td><td>a second party can deterministically get it again</td><td>a future, replayable guarantee</td></tr>
+</tbody>
+</table>
+A search-summary value is often <b>correct and trustworthy but not reproducible</b> — it's query-dependent, re-ranked over
+time, with no stable anchor. <b>A benchmark gold's currency must be <i>reproducibility</i>, not trust</b>, because the gold is
+reused forever to judge other systems.
+</div>
+
+<div class="warn">
+<b>Common misreading we explicitly rejected:</b> "search found it, fetch didn't → untrustworthy." Wrong. The correct statement is:
+"<b>a search-only singleton that no reproducible method can independently re-derive is not gold-grade.</b>" The value may be right —
+but we'd rather leave an explicit gap than freeze an unreproducible singleton. The remedy is to <b>upgrade the evidence,
+not discard the value</b>: use search as a lead, then land it on a reproducible path.
+</div>
+
+<h4>Two orthogonal gates (AND)</h4>
+<p>We made the qualification rule <code>reproducible AND identity-anchored</code>:</p>
+<ul class="tight">
+<li><b>Reproducibility</b> answers <i>"how do I get this value again?"</i> — closed into 4 mechanism classes:
+<b>① direct retrieval</b> (re-fetch / binary download+parse / headless render / API / Wayback),
+<b>② deterministic derivation</b> (unit conversion, aggregation),
+<b>③ producer replay</b> (frozen script + snapshot, the Tier-A/B path),
+<b>④ multi-source corroboration</b> (N sources agree). Falls into none → <code>UNRESOLVED</code>.</li>
+<li><b>Identity anchoring</b> answers <i>"is the value I got the one I wanted?"</i> — entity × attribute × qualifier all match.
+Reproducing <i>a</i> value that belongs to a <i>different</i> entity is a false positive, so the identity gate sits on top of
+<b>every</b> reproduction method.</li>
+</ul>
+
+<h2 id="o3">Obstacle 3 — Verifier blind spots → three routing strategies <span class="badge b-gt">Stage B</span></h2>
+
+<p>A naive Verifier with one <code>web_fetch</code> tool produces wrong verdicts in two systematic ways. We split it into three routes:</p>
+
+<table>
+<thead><tr><th>Route</th><th>Trigger</th><th>What it does</th><th>Blind spot it kills</th></tr></thead>
+<tbody>
+<tr><td><b>① Binary parse</b></td><td>URL ends in .xlsx/.xls/.csv/.pdf</td><td>local download → pandas/openpyxl/pypdf → inject relevant rows into the prompt</td><td><code>web_fetch</code> returns <code>None</code> on binaries; model literally can't read the table</td></tr>
+<tr><td><b>② Standard fetch</b></td><td>normal HTML source</td><td>open the cited URL, read-only, no searching allowed</td><td>routine corroboration</td></tr>
+<tr><td><b>③ Search corroboration</b></td><td>primary failed <b>and</b> the source is unreachable (403/404, no value read)</td><td>loosen the leash, allow Bing / official mirrors to independently confirm the same value</td><td>sites that block scripts (403) but whose value is genuinely confirmable elsewhere</td></tr>
+</tbody>
+</table>
+
+<div class="warn">
+<b>The critical guard:</b> corroboration unlocks only on <b>"source unreachable"</b>, never on <b>"data/range mismatch."</b>
+The predicate <code>_looks_inaccessible()</code> requires <i>unverified + empty found_value + a 403/404-style marker</i>.
+A real data error has a non-empty <code>found_value</code>, so it <b>never</b> triggers the fallback — the safety net can't mask a labeling error.
+</div>
+
+<h2 id="o4">Obstacle 4 — A formal fact identity model <span class="badge b-q2f">Stage A</span></h2>
+
+<p>Early specs produced un-gradable facts: a key that mapped to several "equally valid" values, an empty <code>key={}</code>
+dirty record, and the infamous eGRID emission factor tagged <code>reporting_year=2024</code> but sourced from the <b>2023</b> dataset.
+The fix was to formalize what a fact even <i>is</i>:</p>
+
+<pre>a fact  =  a function   f_attr : (k₁, k₂, …, kₙ) ↦ v
+an instance  =  one point on that function   (key-vector → value)</pre>
+
+<p>Three constraints we then enforced in Query2Facts:</p>
+<ul class="tight">
+<li><b>Must be a function:</b> given the key, the value is unique. If one key yields multiple plausible values, it isn't a
+fact (or the key is under-specified). <code>key={}</code> degenerates to <code>f()→v</code> — empty domain, inherently unverifiable.</li>
+<li><b>Minimal sufficient key:</b> drop any dimension → under-determined; add any dimension → redundant. This is exactly the
+"identity anchor vs descriptive field" split — descriptive fields are redundant dimensions that don't determine the entity.</li>
+<li><b>Don't forget the hidden time/version dimension:</b> an emission factor is <code>attr(geography, reporting_year)</code>,
+not <code>attr(geography)</code>. The <code>refresh</code> field (static/annual/monthly…) <b>is part of the identity model</b> —
+it declares whether time enters the key and whether the value drifts.</li>
+</ul>
+
+<h2 id="o5">Obstacle 5 — Log2Answer extractor: finding the answer in a 180KB distorted log <span class="badge b-eval">Stage C</span></h2>
+
+<p>To grade a real agent we must extract, for each gold identity, what <i>that</i> agent actually answered — from a ~180KB
+mash of thoughts, Python code, stdout, 50+ Bing traces, and a final answer. Three hard sub-problems:</p>
+
+<ol class="tight">
+<li><b>Identity ≠ string match.</b> <code>"Washington, DC"</code> appears as <code>DC</code>, <code>D.C.</code>, <code>District of Columbia</code>;
+<code>"mie"</code> as <code>M&amp;IE</code> / <code>Meals and Incidental Expenses</code>; <code>fy:2026</code> as <code>FY26</code> or even
+<code>"effective Oct 1 2025 – Sep 30 2026"</code> (no "2026" string at all). This is alias resolution + semantic equivalence — an LLM job.</li>
+<li><b>The same value appears 5–10×; which one was <i>adopted</i>?</b> Did a later thought say "I'll use $92"? Was it ever
+referenced by downstream code, or just searched once and dropped?</li>
+<li><b>4 layers = 4 chances to distort.</b> agent query → Bing snippet → summarizer LLM → agent thought. The nastiest mode is
+<b>self-poisoning</b>: the agent puts a <i>guess</i> into the search string (<code>"…M&amp;IE 79 lodging June"</code>), Bing echoes it,
+the summarizer reports "$79 is the rate," and the agent believes its own guess. The real gold was $92; the log contains both.</li>
+</ol>
+
+<div class="info">
+<b>Fix direction:</b> one LLM extract call per gold identity over a trimmed log, emitting
+<code>{found, value, evidence_url, snippet, log_step_ref, confidence, reasoning}</code>, with a stable
+<code>extract_input.json v1.0</code> contract so the evaluator never cares which worker produced the log. The decoupling
+matters: any new agent is graded by wrapping its raw logs into that schema — zero evaluator changes.
+</div>
+
+<h2 id="o6">Obstacle 6 — A structurally poisoned case <span class="badge b-q2f">Stage A</span></h2>
+
+<p>One retail-restock case scored <b>34% (10/31 verified)</b> — the worst of all 10, and <b>18 of 24</b> unresolved errors came from
+it alone. Instead of blaming the agent, we ran a <b>deterministic UPC-A check-digit audit</b> (pure arithmetic, no network) on
+the workbook's 12 barcodes:</p>
+
+<div class="risk">
+<b>10 of 12 UPCs fail their check digit</b> — i.e. those barcodes <b>do not exist in reality</b>. No manufacturer page will ever
+self-report a non-existent code. The single passing instance matched a <i>real</i> page by brand + size + case-pack, not by the fake UPC.
+</div>
+
+<p>Diagnosis: <b>two compounding faults.</b> (1) The user query was <i>partly unsatisfiable</i> — it literally asked to "suggest a
+likely replacement UPC if the vendor changed it," an open research task with no self-reporting source. (2) The spec then <i>amplified</i>
+it by freezing the fake <code>upc</code> + internal <code>item_id</code> as <b>hard identity_keys</b> requiring the page to self-report that UPC —
+two fields that are structurally un-groundable on the public web.</p>
+
+<div class="key">
+<b>Lesson:</b> <span class="tag t-fix">FIX</span> validate the <i>inputs</i> before trusting the scores, and separate
+<b>spec defect</b> from <b>unsatisfiable query</b>. The recommendation was to drop / rebuild the case, not to tune the agent.
+A benchmark that fails is sometimes telling you the <i>question</i> is broken.
+</div>
+
+<h2 id="o7">Obstacle 7 — Refreshing dynamic facts at eval time <span class="badge b-gt">Stage B</span></h2>
+
+<p>Most facts are <code>static</code> (anchored to "as of some month"), but ~16 instances across 4 cases genuinely drift
+(weekly diesel price, daily produce wholesale, annual CDC obesity). A frozen value would be wrong by eval day. We built a
+<b>portable refresh pipeline that imports zero Copilot SDK</b>:</p>
+<ul class="tight">
+<li><b>Tier A — deterministic fetchers</b> (EIA, USDA AMS, CDC): pure <code>urllib</code> + regex, with a <b>drift guard</b> that
+compares the re-fetched value against the frozen one and flags anomalies. Regression: 8/9 targeted instances reproduced the
+frozen value at <b>0.00% drift</b>.</li>
+<li><b>Tier B — vendor catalogs</b> (Fisher/VWR/Sigma): anti-scraping (403) → deferred to playbooks by design, not forced.</li>
+<li>LLM calls go through an abstract interface so Tier A never even touches Azure credentials.</li>
+</ul>
+
+<h2 id="o8">Obstacle 8 — A repair loop that never invents values <span class="badge b-gt">Stage B</span></h2>
+
+<p>Verification failures aren't uniform, so a Layer-6 Repair-Agent triages and recovers them:</p>
+<ol class="tight">
+<li><b>Triage</b> — rule-based classification (binary-unreadable / inaccessible → already handled, SKIP; identity-mismatch → R3; not-found → R4).</li>
+<li><b>Identity re-search</b> — K independent searches anchored on the <code>identity_keys</code>, each re-checked by the strict
+identity verifier, then <b>majority vote</b>.</li>
+<li><b>Escalation</b> — if no candidate satisfies the identity, flag <code>UNRESOLVABLE</code> / possible <code>SPEC_DEFECT</code> for a
+human or a targeted Query2Facts re-run. <b>Never fabricate a value.</b></li>
+<li><b>Re-freeze</b> with full <code>repair_history</code> for auditability.</li>
+</ol>
+
+<h2 id="o9">Obstacle 9 — Throughput / parallelization <span class="badge b-gt">Stage B</span></h2>
+
+<p>A 10-case batch ran <b>5.95 h serially</b>; the GT-Agent is 84% of that (mean 154s, p95 385s, max 606s per call). The code
+spawns <b>one Copilot subprocess per fact instance</b>, strictly <code>await</code>ed in sequence, with a comment claiming
+concurrency "may hit auth/rate limits."</p>
+
+<div class="warn">
+<b>The honest finding:</b> that comment was an <b>untested assumption</b>. The fix was process, not heroics: add a
+<code>--max-concurrent N</code> flag (default 1 = current behavior) and <b>measure</b> N=1/2/4/8 on a small case before committing a
+production value — rather than either blindly serializing (5.95h) or blindly firing 226 sessions at once. Theoretical ceilings:
+per-case ≈ 3.3×, per-fact ≈ 12–18× realistically.
+</div>
+
+<hr>
+
+<h2 id="takeaways">3. Transferable takeaways (the interview version)</h2>
+
+<div class="key">
+<ol class="tight">
+<li><b>Agent-built ground truth shifts the bar from "trust" to "reproducibility."</b> If a second, isolated party can't
+deterministically re-derive a value with the right identity, it isn't gold — leave an explicit gap instead.</li>
+<li><b>Closed taxonomies beat open lists.</b> "Forms of evidence" is endless; <b>4 reproduction mechanisms × an identity gate</b>
+is exhaustive and gives a crisp accept/reject rule.</li>
+<li><b>Asymmetric producer/checker.</b> Recall-optimized GT-Agent + precision-optimized isolated Verifier, with fallbacks that
+unlock only on <i>access</i> failures, never on <i>data</i> mismatches.</li>
+<li><b>Validate inputs before trusting outputs.</b> A deterministic check-digit audit caught a poisoned case that would
+otherwise have looked like model failure. Distinguish <i>spec defect</i> from <i>unsatisfiable query</i>.</li>
+<li><b>Decouple via versioned schemas.</b> <code>fact_spec_template</code> → <code>fact_spec_gold</code> → <code>extract_input v1.0</code>
+let stages (and any future agent) evolve independently.</li>
+<li><b>Debug integrations with elimination + a mock server.</b> The BYOK hang was solved by reproducing the exact request
+locally and noticing the streaming/SSE mismatch — not by guessing.</li>
+<li><b>Measure before you optimize.</b> The "subprocesses are too heavy to parallelize" belief was never tested; the fix was a
+gradual, instrumented rollout.</li>
+</ol>
+</div>
+
+<footer>
+Sources: <code>custom_benchmark/{query2facts,ground_truth_agent,log2answer,refresh}/</code> design docs &amp; code,
+and the build-journal under <code>blogs/htmls/build_benchmark/</code>. Compiled for internship-experience documentation.
+</footer>
+
+</body>
+</html>

@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verifier System - Complete Architecture & Flowchart</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #f5f7fa;
+            color: #333;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px 20px;
+            border-radius: 8px;
+            margin-bottom: 40px;
+        }
+        
+        header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
+        section {
+            background: white;
+            padding: 30px;
+            margin-bottom: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.8em;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+        }
+        
+        h3 {
+            color: #764ba2;
+            margin-top: 20px;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+        
+        .flowchart {
+            background: #f9f9f9;
+            padding: 30px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            margin: 20px 0;
+            overflow-x: auto;
+        }
+        
+        .flowchart svg {
+            display: block;
+            margin: 0 auto;
+            background: white;
+            border-radius: 4px;
+        }
+        
+        .step {
+            background: #f0f4ff;
+            border-left: 4px solid #667eea;
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+        
+        .step.important {
+            background: #fff3cd;
+            border-left-color: #ffc107;
+        }
+        
+        .step.success {
+            background: #d4edda;
+            border-left-color: #28a745;
+        }
+        
+        .step.error {
+            background: #f8d7da;
+            border-left-color: #dc3545;
+        }
+        
+        .step h4 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+        
+        code {
+            background: #f5f5f5;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.9em;
+        }
+        
+        .code-block {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin: 15px 0;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.9em;
+        }
+        
+        .code-block code {
+            background: transparent;
+            color: #f8f8f2;
+            padding: 0;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        
+        th {
+            background: #667eea;
+            color: white;
+        }
+        
+        tr:nth-child(even) {
+            background: #f9f9f9;
+        }
+        
+        .comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 20px 0;
+        }
+        
+        .comparison-item {
+            padding: 20px;
+            border-radius: 4px;
+            border: 2px solid #ddd;
+        }
+        
+        .comparison-item h4 {
+            margin-bottom: 10px;
+        }
+        
+        .comparison-item.before {
+            background: #ffe0e0;
+            border-color: #dc3545;
+        }
+        
+        .comparison-item.after {
+            background: #e0ffe0;
+            border-color: #28a745;
+        }
+        
+        .highlight {
+            background: #fff3cd;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+        
+        ul, ol {
+            margin-left: 20px;
+            margin-top: 10px;
+        }
+        
+        li {
+            margin-bottom: 8px;
+        }
+        
+        .note {
+            background: #e7f3ff;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+        
+        .warning {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+        
+        .diagram {
+            text-align: center;
+            margin: 30px 0;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 4px;
+        }
+        
+        .box {
+            display: inline-block;
+            padding: 15px 20px;
+            margin: 10px;
+            border-radius: 4px;
+            border: 2px solid #667eea;
+            background: white;
+            min-width: 150px;
+        }
+        
+        .arrow {
+            display: inline-block;
+            margin: 0 10px;
+            color: #667eea;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔍 Verifier System - Complete Architecture</h1>
+            <p>How the Verifier validates facts from GT-Agent using identity keys</p>
+        </header>
+        
+        <!-- MAIN FLOWCHART -->
+        <section>
+            <h2>📊 Main Verification Flow</h2>
+            
+            <div class="flowchart">
+                <div style="max-width: 760px; margin: 0 auto; color: #1f2a44; font-weight: 600;">
+                    <div style="background:#e7f3ff;border:2px solid #2196F3;border-radius:8px;padding:12px 14px;text-align:center;">Receive filled instance from GT-Agent</div>
+                    <div style="text-align:center;padding:8px 0;">↓</div>
+                    <div style="background:#f0f4ff;border:2px solid #667eea;border-radius:8px;padding:12px 14px;text-align:center;">Check: value and URL present?</div>
+                    <div style="display:grid;grid-template-columns:1fr 60px 1fr;gap:12px;align-items:start;margin-top:12px;">
+                        <div style="background:#f8d7da;border:2px solid #dc3545;border-radius:8px;padding:10px 12px;text-align:center;">NO: Fail (NULL_VALUE)</div>
+                        <div style="text-align:center;padding-top:12px;">or</div>
+                        <div>
+                            <div style="background:#f0f4ff;border:2px solid #667eea;border-radius:8px;padding:10px 12px;text-align:center;">YES: Fetch from URL</div>
+                            <div style="text-align:center;padding:8px 0;">↓</div>
+                            <div style="background:#fff3cd;border:2px solid #ffc107;border-radius:8px;padding:10px 12px;text-align:center;">URL accessible?</div>
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">
+                                <div style="background:#f0f4ff;border:2px solid #667eea;border-radius:8px;padding:10px 12px;text-align:center;">NO: Web search fallback</div>
+                                <div style="background:#f0f4ff;border:2px solid #667eea;border-radius:8px;padding:10px 12px;text-align:center;">YES: Continue</div>
+                            </div>
+                            <div style="text-align:center;padding:8px 0;">↓</div>
+                            <div style="background:#f0f4ff;border:2px solid #667eea;border-radius:8px;padding:10px 12px;text-align:center;">Check identity keys match page values</div>
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">
+                                <div style="background:#f8d7da;border:2px solid #dc3545;border-radius:8px;padding:10px 12px;text-align:center;">NO: Fail (identity mismatch)</div>
+                                <div style="background:#f0f4ff;border:2px solid #667eea;border-radius:8px;padding:10px 12px;text-align:center;">YES: Extract claimed value</div>
+                            </div>
+                            <div style="text-align:center;padding:8px 0;">↓</div>
+                            <div style="background:#fff3cd;border:2px solid #ffc107;border-radius:8px;padding:10px 12px;text-align:center;">Claimed value found?</div>
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">
+                                <div style="background:#f8d7da;border:2px solid #dc3545;border-radius:8px;padding:10px 12px;text-align:center;">NO: Uncertain (not found)</div>
+                                <div style="background:#d4edda;border:2px solid #28a745;border-radius:8px;padding:10px 12px;text-align:center;">YES: Verified (value confirmed)</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="note">
+                <strong>Key Point:</strong> The verifier has a <strong>two-level fallback system</strong>:
+                <ul>
+                    <li><strong>Primary:</strong> Fetch from cited URL and verify</li>
+                    <li><strong>Fallback:</strong> If URL unreachable (403/404), use web search corroboration instead</li>
+                </ul>
+            </div>
+        </section>
+        
+        <!-- IDENTITY KEY VERIFICATION DETAIL -->
+        <section>
+            <h2>🔑 Identity Key Verification (Core Logic)</h2>
+            
+            <p>The verifier enforces a <strong>strict identity discipline</strong> to ensure it's checking the right entity on the page.</p>
+            
+            <h3>Two-Step Identity Check</h3>
+            
+            <div class="step important">
+                <h4>Step 1: Identity Match Validation</h4>
+                <p>For each identity key in the fact spec, extract the corresponding field value from the page and compare:</p>
+                <div class="code-block"><code>FOR EACH field IN identity_keys:
+    page_value = extract_from_source(source_content, field)
+    instance_value = instance_key[field]
+    
+    IF page_value != instance_value:
+        RETURN FAIL("identity_mismatch_{field}")
+    
+    IF field NOT FOUND in page:
+        RETURN FAIL("identity_not_found:{field}")</code></div>
+            </div>
+            
+            <div class="step important">
+                <h4>Step 2: Anchor Confirmation</h4>
+                <p>After identity keys match, verify that the matched identity anchor actually refers to what the user is asking about. Use remaining (non-identity) key fields as context.</p>
+                <div class="code-block"><code>anchor_is_consistent = check_anchor_against_context(
+    identity_values=instance_key[identity_keys],
+    context_fields=instance_key[non_identity_fields],
+    user_query=task.user_query_excerpt
+)
+
+IF NOT anchor_is_consistent:
+    RETURN FAIL("identity_anchor_mismatch")</code></div>
+            </div>
+            
+            <h3>Why This Matters (Example)</h3>
+            
+            <div class="comparison">
+                <div class="comparison-item before">
+                    <h4>❌ BEFORE (Bad Identity Key)</h4>
+                    <p><strong>Spec identity key:</strong> <code>["tracked_item"]</code></p>
+                    <p><strong>Page lookup:</strong> Search for "tracked_item" field</p>
+                    <p><strong>Result:</strong> Field doesn't exist on page → <code>FAIL</code></p>
+                    <p><strong>Problem:</strong> "tracked_item" is internal terminology, not a web-observable field!</p>
+                </div>
+                
+                <div class="comparison-item after">
+                    <h4>✅ AFTER (Fixed Identity Key)</h4>
+                    <p><strong>Spec identity key:</strong> <code>["law_name"]</code></p>
+                    <p><strong>Page lookup:</strong> Search for "law_name" field (visible column header)</p>
+                    <p><strong>Result:</strong> Found "EU AI Act" → Continue to value check</p>
+                    <p><strong>Benefit:</strong> "law_name" is concrete and observable on pages!</p>
+                </div>
+            </div>
+        </section>
+        
+        <!-- VERIFICATION MODES -->
+        <section>
+            <h2>⚙️ Verification Modes</h2>
+            
+            <p>The verifier supports three source-fetch modes depending on what type of data source the evidence URL points to:</p>
+            
+            <table>
+                <tr>
+                    <th>Mode</th>
+                    <th>Source Type</th>
+                    <th>How It Works</th>
+                    <th>When Used</th>
+                </tr>
+                <tr>
+                    <td><strong>Standard HTML</strong></td>
+                    <td>Web pages (.html, .php, etc.)</td>
+                    <td>Copilot fetches page HTML via web_fetch tool, scans for identity keys &amp; values</td>
+                    <td>Most common; default</td>
+                </tr>
+                <tr>
+                    <td><strong>Binary Files</strong></td>
+                    <td>.xlsx, .xls, .csv, .pdf</td>
+                    <td>Download file, parse locally (Excel/CSV reader or pdfplumber), inject parsed content into verifier prompt</td>
+                    <td>When URL points to downloadable binary document</td>
+                </tr>
+                <tr>
+                    <td><strong>Rendered Pages</strong></td>
+                    <td>JavaScript-heavy sites (SPA, dynamic content)</td>
+                    <td>Use headless browser to render JS, wait for page load, then search for identity keys &amp; values</td>
+                    <td>When static fetch missed value but page is renderable (opt-in via GT_RENDER_FETCH env var)</td>
+                </tr>
+            </table>
+            
+            <h3>Mode Selection Logic</h3>
+            
+            <div class="diagram">
+                <div style="text-align: left; display: inline-block;">
+                    <div class="box" style="background: #fff3cd; border-color: #ffc107;">Check URL</div>
+                    <div class="arrow">↓</div>
+                    
+                    <div class="box" style="background: #e7f3ff; border-color: #2196F3;">Detect binary?<br/>(.xlsx, .pdf, etc.)</div>
+                    <div style="margin-top: 20px;">
+                        <span class="box" style="background: #d4edda; border-color: #28a745; width: 120px;">YES → Parse Binary</span>
+                        <span class="arrow">  OR  </span>
+                        <span class="box" style="background: #f0f4ff; border-color: #667eea; width: 120px;">NO → Fetch HTML</span>
+                    </div>
+                    <div class="arrow" style="margin-top: 20px;">↓</div>
+                    
+                    <div class="box" style="background: #e7f3ff; border-color: #2196F3;">Verify against content</div>
+                    <div class="arrow">↓</div>
+                    
+                    <div class="box" style="background: #fff3cd; border-color: #ffc107;">Failed? (value not found)</div>
+                    <div style="margin-top: 20px;">
+                        <span class="box" style="background: #f0f4ff; border-color: #667eea; width: 140px;">Try Render Fallback?</span>
+                        <span style="margin: 0 10px;">→</span>
+                        <span class="box" style="background: #d4edda; border-color: #28a745; width: 120px;">If Enabled</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- DECISION OUTCOMES -->
+        <section>
+            <h2>📋 Verification Outcomes</h2>
+            
+            <p>Each verification returns a result object with three fields:</p>
+            
+            <div class="code-block"><code>{
+    "verified": bool,           # True only if identity match + value found
+    "found_value": str | null,  # The value found on page (or null if not found)
+    "issues": [str]             # List of reasons for failure
+}</code></div>
+            
+            <h3>Success Criteria</h3>
+            
+            <div class="step success">
+                <h4>✅ VERIFIED (verified=true)</h4>
+                <ul>
+                    <li>Instance has value + URL</li>
+                    <li>URL is accessible</li>
+                    <li>All identity keys match page values exactly</li>
+                    <li>The claimed value is found on the page</li>
+                </ul>
+            </div>
+            
+            <h3>Failure Scenarios</h3>
+            
+            <div class="step error">
+                <h4>❌ NULL_VALUE / NO_URL</h4>
+                <p><strong>Cause:</strong> GT-Agent didn't fill the instance properly</p>
+                <p><strong>Fix:</strong> Re-run GT-Agent with more rounds or better prompts</p>
+            </div>
+            
+            <div class="step error">
+                <h4>❌ IDENTITY_NOT_FOUND</h4>
+                <p><strong>Cause:</strong> Identity key field doesn't exist on page (e.g., "tracked_item" doesn't exist)</p>
+                <p><strong>Fix:</strong> <span class="highlight">This is what we're fixing!</span> Rename to web-observable field like "law_name"</p>
+            </div>
+            
+            <div class="step error">
+                <h4>❌ IDENTITY_MISMATCH</h4>
+                <p><strong>Cause:</strong> Identity key value on page doesn't match what's in the spec</p>
+                <p><strong>Example:</strong> Spec says "state=CA" but page shows "state=TX"</p>
+                <p><strong>Fix:</strong> Correct the identity key value in the spec to match page reality</p>
+            </div>
+            
+            <div class="step error">
+                <h4>❌ NOT_FOUND</h4>
+                <p><strong>Cause:</strong> Identity matched, but the claimed value isn't on the page</p>
+                <p><strong>Example:</strong> Correct law ("EU AI Act") found, but "2024-06-10" date not present</p>
+                <p><strong>Fix:</strong> Value may be missing or outdated; verify manually or try different page</p>
+            </div>
+            
+            <div class="step error">
+                <h4>⚠️ URL_INACCESSIBLE (403/404)</h4>
+                <p><strong>Cause:</strong> Cited URL is blocked or doesn't exist</p>
+                <p><strong>Fallback:</strong> Attempts web search corroboration if enabled</p>
+                <p><strong>Result:</strong> May still verify if corroboration finds evidence</p>
+            </div>
+        </section>
+        
+        <!-- IMPACT OF FIX -->
+        <section>
+            <h2>💡 Impact: Identity Key Simplification</h2>
+            
+            <h3>The Problem (22.7% pass rate baseline)</h3>
+            
+            <div class="warning">
+                <strong>68.9% of verification failures (252/366) were identity-related:</strong>
+                <ul>
+                    <li><code>identity_not_found</code> - Abstract field names don't exist on pages</li>
+                    <li><code>identity_mismatch</code> - Wrong values matched wrong entities</li>
+                </ul>
+            </div>
+            
+            <h3>27 Fixes Applied</h3>
+            
+            <table>
+                <tr>
+                    <th>Old (Abstract)</th>
+                    <th>New (Observable)</th>
+                    <th>Why It Matters</th>
+                </tr>
+                <tr>
+                    <td><code>tracked_item</code></td>
+                    <td><code>name</code></td>
+                    <td>"name" is an actual column header; "tracked_item" doesn't exist</td>
+                </tr>
+                <tr>
+                    <td><code>period</code></td>
+                    <td><code>date</code></td>
+                    <td>More specific; pages show "date", not generic "period"</td>
+                </tr>
+                <tr>
+                    <td><code>period_start_year</code></td>
+                    <td><code>start_year</code></td>
+                    <td>Shorter, clearer, matches how pages label this dimension</td>
+                </tr>
+                <tr>
+                    <td><code>jurisdiction</code></td>
+                    <td><code>location</code></td>
+                    <td>"location" is more observable; "jurisdiction" is domain-specific</td>
+                </tr>
+                <tr>
+                    <td><code>tou_period</code></td>
+                    <td><code>time_of_use</code></td>
+                    <td>Expanded abbreviation; more likely to match page terminology</td>
+                </tr>
+            </table>
+            
+            <h3>Expected Impact</h3>
+            
+            <div class="step success">
+                <h4>✅ Cascading Improvement</h4>
+                <ol>
+                    <li>Fixed identity keys are <span class="highlight">observable on pages</span></li>
+                    <li>Verifier can find matching identity fields → <code>identity_not_found</code> errors drop</li>
+                    <li>Identity matches lead to correct entity scope → subsequent value searches succeed</li>
+                    <li>Overall verification pass rate should increase <strong>5-10%</strong> (conservative estimate)</li>
+                </ol>
+            </div>
+            
+            <div class="note">
+                <strong>Conservative estimate:</strong> If identity issues account for 68.9% of failures, and we fix ~50% of identity problems, we expect ~34% of failures to be eliminated, boosting pass rate from 22.7% → 28-30%+
+            </div>
+        </section>
+        
+        <!-- ARCHITECTURE DIAGRAM -->
+        <section>
+            <h2>🏗️ Verifier Architecture (System Level)</h2>
+            
+            <div class="diagram">
+                <div style="text-align: left; display: inline-block; font-size: 0.9em;">
+                    <div style="background: #e7f3ff; padding: 15px; border-radius: 4px; margin-bottom: 15px; border-left: 4px solid #2196F3;">
+                        <strong>Input:</strong> Filled instance from GT-Agent
+                        <div style="font-size: 0.85em; margin-top: 5px;">{ value, evidence_url, identity_keys }</div>
+                    </div>
+                    
+                    <div style="text-align: center; margin: 15px 0;">↓</div>
+                    
+                    <div style="background: #f0f4ff; padding: 15px; border-radius: 4px; margin-bottom: 15px; border-left: 4px solid #667eea;">
+                        <strong>Verifier Module</strong>
+                        <div style="font-size: 0.85em; margin-top: 10px; text-align: left;">
+                            • Binary detector (detect .xlsx/.pdf/.csv)<br/>
+                            • HTML fetcher (web_fetch tool)<br/>
+                            • Binary parser (Excel/CSV/PDF reader)<br/>
+                            • Render engine (headless browser)
+                        </div>
+                    </div>
+                    
+                    <div style="text-align: center; margin: 15px 0;">↓</div>
+                    
+                    <div style="background: #fff3cd; padding: 15px; border-radius: 4px; margin-bottom: 15px; border-left: 4px solid #ffc107;">
+                        <strong>Core Verification Logic</strong>
+                        <div style="font-size: 0.85em; margin-top: 10px; text-align: left;">
+                            1. Extract identity key values from page<br/>
+                            2. Compare against instance keys<br/>
+                            3. Extract claimed value from page<br/>
+                            4. Compare against instance value
+                        </div>
+                    </div>
+                    
+                    <div style="text-align: center; margin: 15px 0;">↓</div>
+                    
+                    <div style="background: #d4edda; padding: 15px; border-radius: 4px; border-left: 4px solid #28a745;">
+                        <strong>Output:</strong> Verification result
+                        <div style="font-size: 0.85em; margin-top: 5px;">{ verified, found_value, issues }</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- KEY INSIGHTS -->
+        <section>
+            <h2>🎯 Key Insights</h2>
+            
+            <div class="step">
+                <h4>1. Identity Keys Are Filters</h4>
+                <p>Identity keys narrow down the "scope" of the search. They answer: <strong>"Which row/section on the page are we checking?"</strong></p>
+                <p>Example: "Get the unemployment rate for California, Q1 2024"</p>
+                <ul>
+                    <li><code>state: "California"</code> → identity key (scopes to CA rows)</li>
+                    <li><code>quarter: "Q1"</code> → identity key (scopes to Q1 data)</li>
+                    <li><code>year: "2024"</code> → identity key (scopes to 2024 records)</li>
+                </ul>
+            </div>
+            
+            <div class="step">
+                <h4>2. All Identity Keys Must Match for Verification to Pass</h4>
+                <p>If ANY identity key doesn't match, verification fails immediately. This is intentional—it ensures we're checking the right scope.</p>
+            </div>
+            
+            <div class="step">
+                <h4>3. Abstract Keys Kill Verification</h4>
+                <p><code>"tracked_item"</code>, <code>"period"</code>, <code>"jurisdiction"</code> are database/internal terms. Pages don't use them. Rename to what pages actually show: <code>"name"</code>, <code>"date"</code>, <code>"location"</code>.</p>
+            </div>
+            
+            <div class="step">
+                <h4>4. Fallback Modes Add Resilience</h4>
+                <p>If the cited URL is inaccessible (403/404), the verifier can still try web search corroboration. This prevents spurious failures when pages move or block access.</p>
+            </div>
+            
+            <div class="step success">
+                <h4>5. Identity Key Simplification is the Highest-Impact Fix</h4>
+                <p>68.9% of failures are identity-related. Fixing identity keys alone could improve pass rate by 5-10 percentage points (from 22.7% → 28%+). This is our validation test.</p>
+            </div>
+        </section>
+        
+        <!-- VALIDATION TEST STATUS -->
+        <section>
+            <h2>🧪 Current Validation Test</h2>
+            
+            <div class="note">
+                <strong>Status:</strong> Running Stage B on 3 test cases with fixed identity keys
+                <ul>
+                    <li><code>soc-13-1081.02_task-15900_v2</code> (2 facts, 2 instances)</li>
+                    <li><code>soc-15-2041.00_task-8953_v2</code> (1 fact, 3 instances)</li>
+                    <li><code>soc-19-2041.03_task-19978_v1</code> (? facts, ? instances)</li>
+                </ul>
+            </div>
+            
+            <h3>What We're Measuring</h3>
+            <ol>
+                <li><strong>Baseline pass rate:</strong> From original specs (22.7%)</li>
+                <li><strong>Test pass rate:</strong> With fixed identity keys (in progress)</li>
+                <li><strong>Improvement:</strong> Target 5%+ increase → proceed to Phase 2</li>
+            </ol>
+            
+            <h3>Decision Criteria</h3>
+            <ul>
+                <li><strong>If +5% improvement:</strong> ✅ Identity key fix works! Proceed with Phase 2 (all 25 cases)</li>
+                <li><strong>If 0-5% improvement:</strong> ⚠️ Marginal; can still proceed with Phase 2</li>
+                <li><strong>If negative:</strong> ❌ Regression; debug before Phase 2</li>
+            </ul>
+        </section>
+    </div>
+</body>
+</html>

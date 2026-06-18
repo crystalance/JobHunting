@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Custom Benchmark — Generating Pipeline Flowchart</title>
+<style>
+  :root{
+    --ink:#1b1f24; --muted:#57606a; --line:#c4ccd4;
+    --q2f:#0969da; --q2f-bg:#ddf4ff;
+    --gt:#1a7f37;  --gt-bg:#dafbe1;
+    --rep:#bc4c00; --rep-bg:#fff1e5;
+    --ref:#8250df; --ref-bg:#f3eefc;
+    --eval:#cf222e; --eval-bg:#ffebe9;
+    --io:#9a6700;  --io-bg:#fff8c5;
+    --card:#ffffff;
+  }
+  *{box-sizing:border-box}
+  body{
+    font-family:-apple-system,"Segoe UI","Microsoft YaHei",Roboto,Helvetica,Arial,sans-serif;
+    color:var(--ink); background:#f4f6f8; margin:0; padding:32px 20px 80px; line-height:1.45;
+  }
+  .wrap{max-width:1240px;margin:0 auto}
+  h1{font-size:26px;margin:0 0 4px;border-bottom:3px solid var(--q2f);padding-bottom:10px}
+  .sub{color:var(--muted);font-size:14px;margin:6px 0 26px}
+  .sub code{background:#eef1f4;padding:1px 6px;border-radius:4px;font-family:"Cascadia Code",Consolas,monospace;font-size:12.5px}
+
+  /* legend */
+  .legend{display:flex;flex-wrap:wrap;gap:10px 18px;margin:0 0 30px;font-size:13px}
+  .legend span{display:inline-flex;align-items:center;gap:7px}
+  .dot{width:13px;height:13px;border-radius:3px;display:inline-block}
+
+  /* stage band */
+  .stage{position:relative;border-radius:14px;padding:18px 20px 22px;margin:0 0 8px;border:1px solid var(--line);background:var(--card)}
+  .stage-head{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+  .chip{font-size:12px;font-weight:700;color:#fff;border-radius:20px;padding:3px 12px;letter-spacing:.3px}
+  .stage-head h2{font-size:18px;margin:0}
+  .stage-head .path{margin-left:auto;font-size:12px;color:var(--muted);font-family:"Cascadia Code",Consolas,monospace}
+
+  /* row of step cards */
+  .row{display:flex;align-items:stretch;gap:0;flex-wrap:wrap}
+  .card{
+    flex:1 1 0;min-width:180px;background:var(--card);border:1.5px solid var(--line);
+    border-radius:10px;padding:12px 14px;position:relative;
+  }
+  .card h3{font-size:14px;margin:0 0 6px;display:flex;align-items:center;gap:7px}
+  .card .tag{font-size:10.5px;font-weight:700;padding:1px 7px;border-radius:10px;text-transform:uppercase;letter-spacing:.4px}
+  .tag-llm{background:#ffe8c2;color:#9a6700}
+  .tag-code{background:#e3e8ee;color:#445}
+  .tag-agent{background:#dafbe1;color:#1a7f37}
+  .card p{margin:0;font-size:12.3px;color:#3a4350}
+  .card .files{margin-top:8px;font-size:11px;color:var(--muted);font-family:"Cascadia Code",Consolas,monospace;word-break:break-word}
+
+  /* horizontal arrow between cards */
+  .arrow-h{display:flex;align-items:center;justify-content:center;flex:0 0 30px;color:var(--muted);font-size:22px;font-weight:700}
+
+  /* vertical arrow between stages */
+  .arrow-v{display:flex;flex-direction:column;align-items:center;margin:2px 0}
+  .arrow-v .lbl{font-size:11.5px;color:var(--muted);background:#eef1f4;border-radius:12px;padding:2px 12px;margin-bottom:2px;font-family:"Cascadia Code",Consolas,monospace}
+  .arrow-v .tip{color:var(--line);font-size:20px;line-height:1}
+  .arrow-v .stem{width:2px;height:14px;background:var(--line)}
+
+  /* io pill */
+  .io{display:flex;justify-content:center;margin:8px 0}
+  .io .pill{background:var(--io-bg);border:1.5px solid var(--io);color:#6b4e00;border-radius:30px;
+    padding:9px 22px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:10px;max-width:760px;text-align:center}
+  .io .pill code{background:#fff3bf;padding:1px 6px;border-radius:4px;font-size:12px;font-family:"Cascadia Code",Consolas,monospace}
+
+  /* loop badge */
+  .loopnote{margin-top:12px;font-size:12px;color:var(--muted);display:flex;align-items:center;gap:8px;flex-wrap:wrap}  .loopnote b{color:var(--ink)}
+  .loop-pill{background:#f0f3f6;border:1px dashed var(--line);border-radius:8px;padding:6px 12px;font-size:12px}
+
+  /* L4 source-type router */
+  .router{margin-top:16px;border:1.5px dashed var(--gt);background:#f6fbf7;border-radius:10px;padding:14px 16px 16px}
+  .router-head{font-size:13.5px;font-weight:700;color:var(--gt);margin-bottom:12px}
+  .router-sub{font-weight:400;color:var(--muted);font-size:12px}
+  .router-row{gap:12px}
+  .router-row .arrow-h{display:none}
+  .card.path{flex:1 1 200px;border-color:#bfe3c8;background:#fff}
+  .card.path h3{font-size:13px}
+  .branch{border-style:dashed}
+  .footer{margin-top:34px;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:14px}
+  .footer code{font-family:"Cascadia Code",Consolas,monospace;background:#eef1f4;padding:1px 5px;border-radius:4px}
+
+  /* color helpers */
+  .s-q2f .chip{background:var(--q2f)} .s-q2f{box-shadow:inset 4px 0 0 var(--q2f)}
+  .s-gt  .chip{background:var(--gt)}  .s-gt {box-shadow:inset 4px 0 0 var(--gt)}
+  .s-rep .chip{background:var(--rep)} .s-rep{box-shadow:inset 4px 0 0 var(--rep)}
+  .s-ref .chip{background:var(--ref)} .s-ref{box-shadow:inset 4px 0 0 var(--ref)}
+  .s-eval .chip{background:var(--eval)} .s-eval{box-shadow:inset 4px 0 0 var(--eval)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Custom Benchmark — Benchmark-Generating Pipeline</h1>
+  <p class="sub">
+    A web-search benchmark builder for Excel-Copilot-style tasks. Raw user query + workbook dump
+    &rarr; structured <code>fact_spec</code> &rarr; web-searched, independently-verified
+    <code>fact_spec_gold</code> &rarr; freshness maintenance &rarr; scoring of any candidate agent.
+    Source: <code>custom_benchmark/</code>
+  </p>
+
+  <div class="legend">
+    <span><i class="dot" style="background:var(--q2f)"></i>query2facts (spec authoring)</span>
+    <span><i class="dot" style="background:var(--gt)"></i>ground_truth_agent (gold filling)</span>
+    <span><i class="dot" style="background:var(--rep)"></i>repair</span>
+    <span><i class="dot" style="background:var(--ref)"></i>refresh (maintenance)</span>
+    <span><i class="dot" style="background:var(--eval)"></i>evaluation / scoring</span>
+    <span><i class="dot" style="background:var(--io)"></i>data artifact</span>
+    &nbsp;|&nbsp;
+    <span><i class="tag tag-llm">LLM</i></span>
+    <span><i class="tag tag-agent">AGENT</i></span>
+    <span><i class="tag tag-code">CODE</i></span>
+  </div>
+
+  <!-- ================= INPUT ================= -->
+  <div class="io">
+    <div class="pill">
+      📁 <b>Per-case fixture</b> &nbsp;<code>cases/&lt;case_id&gt;/</code>
+      &nbsp;·&nbsp; <code>*requirement*.md</code> (user query) &nbsp;+&nbsp; <code>excel_dump.txt</code> (workbook state)
+    </div>
+  </div>
+
+  <div class="arrow-v"><span class="stem"></span><span class="tip">▼</span></div>
+
+  <!-- ================= STAGE 1: query2facts ================= -->
+  <div class="stage s-q2f">
+    <div class="stage-head">
+      <span class="chip">STAGE 1</span>
+      <h2>query2facts &nbsp;—&nbsp; author the fact specification</h2>
+      <span class="path">query2facts/fact_spec_pipeline/run.py</span>
+    </div>
+
+    <div class="row">
+      <div class="card">
+        <h3>1 · Extract facts <span class="tag tag-llm">LLM</span></h3>
+        <p>Reads query + workbook dump. Emits atomic, web-verifiable facts (rules R1–R3, drop rules X1–X7). Each fact: <code>type</code>, <code>unit</code>, <code>refresh</code>, <code>enumeration</code>, <code>identity_keys</code>, instances.</p>
+        <div class="files">run.py · run_one() · SYSTEM_PROMPT</div>
+      </div>
+      <div class="arrow-h">→</div>
+      <div class="card">
+        <h3>2 · Review identity keys <span class="tag tag-llm">LLM</span></h3>
+        <p>Second pass audits &amp; minimises <code>identity_keys</code> so a verifier can uniquely &amp; source-visibly locate each instance. Writes diff trail.</p>
+        <div class="files">reviewer.py · review_spec() → *.review.json</div>
+      </div>
+      <div class="arrow-h">→</div>
+      <div class="card">
+        <h3>3 · Normalize &amp; score <span class="tag tag-code">CODE</span></h3>
+        <p>Validates keys, empties <code>instances</code> for <i>discovered</i> facts, computes <code>case_max_score</code>, pins <code>schema_version 0.7</code> / binary scoring.</p>
+        <div class="files">normalize_identity_keys() · recompute_max_score()</div>
+      </div>
+    </div>
+
+    <div class="loopnote">
+      <span class="loop-pill">enumeration = <b>fixed</b> → all instance keys listed now</span>
+      <span class="loop-pill">enumeration = <b>discovered</b> → only key_schema + filter (GT-Agent enumerates later)</span>
+    </div>
+  </div>
+
+  <div class="arrow-v"><span class="lbl">fact_spec_template.json</span><span class="stem"></span><span class="tip">▼</span></div>
+
+  <!-- ================= STAGE 2: ground_truth_agent ================= -->
+  <div class="stage s-gt">
+    <div class="stage-head">
+      <span class="chip">STAGE 2</span>
+      <h2>ground_truth_agent &nbsp;—&nbsp; fill &amp; verify the gold answers</h2>
+      <span class="path">ground_truth_agent/run.py · 5 layers</span>
+    </div>
+
+    <div class="row">
+      <div class="card">
+        <h3>L1 · Dispatcher <span class="tag tag-code">CODE</span></h3>
+        <p>Expands spec → <code>TaskBundle[]</code>. Batches fixed instances (~12/session), 1 task per discovered fact. Injects full query + workbook ±3 rows.</p>
+        <div class="files">dispatcher.py · expand_case()</div>
+      </div>
+      <div class="arrow-h">→</div>
+      <div class="card">
+        <h3>L2 · GT-Agent <span class="tag tag-agent">AGENT</span></h3>
+        <p>Copilot session w/ built-in <code>web_search</code> + <code>fetch</code>. Fills <code>value</code>, <code>evidence_url</code>, <code>snippet</code>, <code>as_of</code>. Null over guess.</p>
+        <div class="files">gt_agent.py · copilot_session.py → Candidate</div>
+      </div>
+      <div class="arrow-h">→</div>
+      <div class="card">
+        <h3>L3 · Fill-Loop <span class="tag tag-code">CODE</span></h3>
+        <p>Concurrent retry controller. Re-dispatches only null/unverified instances, monotonic merge. Dynamic facts emit a skill proposal.</p>
+        <div class="files">fill_loop.py · fill_case() · proposal_writer.py</div>
+      </div>
+      <div class="arrow-h">→</div>
+      <div class="card">
+        <h3>L4 · Verifier <span class="tag tag-agent">AGENT</span></h3>
+        <p>Isolated session re-fetches the cited URL independently → <code>verified: bool</code>. <b>Routes by source type</b> ↓ — the built-in fetch can't read binaries and won't run JS, so each type gets its own extractor.</p>
+        <div class="files">verifier.py · verify_one()</div>
+      </div>
+    </div>
+
+    <!-- ===== L4 source-type router ===== -->
+    <div class="router">
+      <div class="router-head">L4 · Verifier — source-type routing &nbsp;<span class="router-sub">each path pre-parses evidence, then a Copilot session judges <code>verified</code> with a path-specific system prompt</span></div>
+      <div class="row router-row">
+        <div class="card path">
+          <h3>① Normal HTML <span class="tag tag-agent">AGENT</span></h3>
+          <p>Default. Verifier session uses Copilot's built-in <code>fetch_page</code> to read the static page itself.</p>
+          <div class="files">VERIFIER_SYSTEM_PROMPT</div>
+        </div>
+        <div class="card path">
+          <h3>② Binary file <span class="tag tag-code">CODE</span></h3>
+          <p><code>.xlsx · .xls · .csv · .pdf</code> — built-in fetch returns null on binaries. We download &amp; parse rows matching the key/value, inject ≤14k chars of text into the prompt.</p>
+          <div class="files">detect_binary() · binary_parser.extract_evidence() · VERIFIER_BINARY_SYSTEM_PROMPT</div>
+        </div>
+        <div class="card path">
+          <h3>③ JS-rendered / SPA <span class="tag tag-code">CODE</span></h3>
+          <p>Opt-in <code>GT_RENDER_FETCH</code>. Value injected by client JS, absent from static HTML. Headless Chromium (Playwright) renders, waits for network idle, extracts <code>innerText</code> lines near the key.</p>
+          <div class="files">detect_renderable() · render_fetcher.render_evidence() · VERIFIER_RENDERED_SYSTEM_PROMPT</div>
+        </div>
+        <div class="card path">
+          <h3>④ Inaccessible → corroborate <span class="tag tag-agent">AGENT</span></h3>
+          <p>Cited URL 403/404/failed-to-fetch. Falls back to a fresh <code>web_search</code> for an alternative authoritative source, then re-verifies the value there.</p>
+          <div class="files">_INACCESSIBLE_MARKERS · VERIFIER_CORROBORATE_SYSTEM_PROMPT</div>
+        </div>
+      </div>
+      <div class="loopnote" style="margin-top:10px">
+        <span class="loop-pill">identity match: <b>agentic</b> (format-equivalent values accepted) by default · <code>GT_VERIFIER_STRICT</code> → byte-for-byte regression mode</span>
+      </div>
+    </div>
+
+    <div class="loopnote">
+      <span class="loop-pill">↺ <b>L3 loop</b>: rounds 1…MAX_ROUNDS, only unfilled / unverified re-queued</span>
+      <span class="loop-pill">dynamic fact (<code>refresh ≠ static</code>) → Tier A parser / Tier B playbook written to <code>refresh/skills/_proposals/</code></span>
+    </div>
+
+    <div class="arrow-v" style="margin-top:14px"><span class="lbl">L5 · freeze()</span><span class="stem"></span><span class="tip">▼</span></div>
+    <div class="io">
+      <div class="pill">📦 <b>fact_spec_gold.json</b> — frozen oracle: per-instance value + evidence_url + as_of + <code>verified</code> flag</div>
+    </div>
+  </div>
+
+  <div class="arrow-v"><span class="lbl">instances with verified=false</span><span class="stem"></span><span class="tip">▼</span></div>
+
+  <!-- ================= STAGE 3: repair ================= -->
+  <div class="stage s-rep branch">
+    <div class="stage-head">
+      <span class="chip">STAGE 3</span>
+      <h2>repair &nbsp;—&nbsp; rescue unverified instances</h2>
+      <span class="path">ground_truth_agent/repair.py · run_repair.py</span>
+    </div>
+    <div class="row">
+      <div class="card">
+        <h3>Triage failure <span class="tag tag-code">CODE</span></h3>
+        <p>Classifies each <code>verified=false</code> instance: R3 identity mismatch · R4 not found · R5 value conflict (R1/R2 already handled upstream).</p>
+      </div>
+      <div class="arrow-h">→</div>
+      <div class="card">
+        <h3>Identity-anchored re-search <span class="tag tag-agent">AGENT</span></h3>
+        <p>Re-searches with identity keys + majority voting across sources to settle conflicts and find missing values.</p>
+      </div>
+      <div class="arrow-h">→</div>
+      <div class="card">
+        <h3>Emit repaired gold <span class="tag tag-code">CODE</span></h3>
+        <p>Writes <code>*.repaired.fact_spec_gold.json</code> + <code>repair_report.json</code> (in-place option).</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="arrow-v"><span class="lbl">verified gold · split static vs dynamic</span><span class="stem"></span><span class="tip">▼</span></div>
+
+  <!-- ================= STAGE 4: refresh ================= -->
+  <div class="stage s-ref branch">
+    <div class="stage-head">
+      <span class="chip">STAGE 4</span>
+      <h2>refresh &nbsp;—&nbsp; keep dynamic facts fresh over time</h2>
+      <span class="path">refresh/run_refresh.py</span>
+    </div>
+    <div class="row">
+      <div class="card">
+        <h3>Resolve skill <span class="tag tag-code">CODE</span></h3>
+        <p>Maps each non-static instance to a registered skill by host. Tier A = deterministic parser; Tier B = LLM playbook.</p>
+        <div class="files">refresh_agent.py · registry.py</div>
+      </div>
+      <div class="arrow-h">→</div>
+      <div class="card">
+        <h3>Fetch fresh value <span class="tag tag-agent">AGENT</span></h3>
+        <p>Tier A runs <code>parser(snapshot)</code> / live fetch; Tier B does <code>web_search</code> + playbook-grounded LLM extraction.</p>
+        <div class="files">skills/ · fetchers/ · tier_b.py</div>
+      </div>
+      <div class="arrow-h">→</div>
+      <div class="card">
+        <h3>Verify drift <span class="tag tag-code">CODE</span></h3>
+        <p>Checks identity match + value present + drift ≤ threshold (~60%). Flags suspicious jumps.</p>
+        <div class="files">refresh_verifier.py</div>
+      </div>
+      <div class="arrow-h">→</div>
+      <div class="card">
+        <h3>Consolidate &amp; promote <span class="tag tag-code">CODE</span></h3>
+        <p>Tests proposed parsers offline (replay) + live; promotes good ones <code>_proposals/ → skills/</code>. Emits <code>RefreshManifest</code>.</p>
+        <div class="files">consolidate.py</div>
+      </div>
+    </div>
+    <div class="loopnote">
+      <span class="loop-pill">↻ runs on a cadence (annual / monthly / weekly / daily) per fact <code>refresh</code> tier — feeds updated values back into gold</span>
+    </div>
+
+    <!-- ===== eval-time refresh resolution ===== -->
+    <div class="router">
+      <div class="router-head">At evaluation time — resolve each fact to a current value before scoring &nbsp;<span class="router-sub">static facts use frozen gold as-is; dynamic facts are re-derived per instance via <code>run_refresh</code></span></div>
+      <div class="row router-row">
+        <div class="card path">
+          <h3>◇ Route by tier <span class="tag tag-code">CODE</span></h3>
+          <p>For each instance, resolve a skill by the <code>evidence_url</code> host. No skill → unroutable. Picks Tier A vs Tier B.</p>
+          <div class="files">refresh_agent.run_instance() · registry.resolve_by_host()</div>
+        </div>
+        <div class="card path">
+          <h3>Ⓐ Tier A — replay <span class="tag tag-code">CODE</span></h3>
+          <p>Deterministic, offline. Re-run the parser on the frozen build-time <code>snippet</code> snapshot — proves the producer reproduces the product, zero network flakiness.</p>
+          <div class="files">parser(snapshot, key, type)</div>
+        </div>
+        <div class="card path">
+          <h3>Ⓐ Tier A — live <span class="tag tag-agent">AGENT</span></h3>
+          <p>Best-effort <code>--live</code>. Call the skill's <code>fetch()</code> against the live source to pull a fresh value from the same authority.</p>
+          <div class="files">module.fetch({key, source_url})</div>
+        </div>
+        <div class="card path">
+          <h3>Ⓑ Tier B — live playbook <span class="tag tag-agent">AGENT</span></h3>
+          <p>Anti-scrape sources (no clean parser). Build query from identity → <code>web_search</code> → LLM playbook extraction. Deferred in replay (no snapshot).</p>
+          <div class="files">tier_b.run_playbook(skill, key, type, web_search, llm)</div>
+        </div>
+      </div>
+      <div class="arrow-v" style="margin:12px 0 4px"><span class="lbl">verify(new vs old) · drift_pct</span><span class="stem"></span><span class="tip">▼</span></div>
+      <div class="loopnote" style="justify-content:center">
+        <span class="loop-pill" style="border-style:solid;background:var(--gt-bg);border-color:#bfe3c8">REPRODUCED <span style="color:var(--muted)">replay matches frozen</span></span>
+        <span class="loop-pill" style="border-style:solid;background:var(--gt-bg);border-color:#bfe3c8">REFRESHED <span style="color:var(--muted)">live value adopted</span></span>
+        <span class="loop-pill">DEFERRED <span style="color:var(--muted)">Tier B in replay</span></span>
+        <span class="loop-pill" style="background:var(--eval-bg);border-color:#ffc1bd">UNRESOLVED <span style="color:var(--muted)">no value / null target</span></span>
+      </div>
+      <div class="loopnote" style="justify-content:center;margin-top:8px">
+        <span class="loop-pill">→ emits <b>RefreshManifest</b> (old_value, new_value, verified, drift_pct, status) → <code>_regression.json</code>; refreshed values become the live oracle for Stage 5</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="arrow-v"><span class="lbl">benchmark ready · oracle = static gold + eval-time-refreshed dynamic values</span><span class="stem"></span><span class="tip">▼</span></div>
+
+  <!-- ================= STAGE 5: evaluation ================= -->
+  <div class="stage s-eval">
+    <div class="stage-head">
+      <span class="chip">STAGE 5</span>
+      <h2>evaluation &nbsp;—&nbsp; score any candidate agent</h2>
+      <span class="path">run_experiment.py · log2answer/ · framework/</span>
+    </div>
+    <div class="row">
+      <div class="card">
+        <h3>Run candidate agent <span class="tag tag-agent">AGENT</span></h3>
+        <p>Pluggable agent maps <code>(task_md, workbook)</code> → answer + search trace. Baseline = naive search/final loop.</p>
+        <div class="files">agents/baseline_agent.py</div>
+      </div>
+      <div class="arrow-h">→</div>
+      <div class="card">
+        <h3>log → answer <span class="tag tag-llm">LLM</span></h3>
+        <p>Extracts what the agent actually found from its raw log (grep_log / read_step tools), per gold instance.</p>
+        <div class="files">log2answer/extract_agent.py · tools.py</div>
+      </div>
+      <div class="arrow-h">→</div>
+      <div class="card">
+        <h3>Grade vs gold <span class="tag tag-code">CODE</span></h3>
+        <p>Deterministic compare: numeric ±tol%, string case-fold, URL host suffix, list set-equality. Recall / value-precision.</p>
+        <div class="files">log2answer/grader.py</div>
+      </div>
+      <div class="arrow-h">→</div>
+      <div class="card">
+        <h3>Rubric scoring <span class="tag tag-code">CODE</span></h3>
+        <p>Shared engine, per-case rubric: <code>score = correctness × source_tier × staleness</code>, gated by critical nodes.</p>
+        <div class="files">framework/grader.py · rubric.py → ScoreReport</div>
+      </div>
+    </div>
+    <div class="arrow-v" style="margin-top:14px"><span class="stem"></span><span class="tip">▼</span></div>
+    <div class="io">
+      <div class="pill">📊 <b>score_report.json</b> — case_score · critical_pass · per-node verdicts &nbsp;→&nbsp; <code>results/&lt;case&gt;_&lt;model&gt;_&lt;ts&gt;/</code></div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <b>Design notes.</b>
+    Spec primitives are <b>shared</b> while each case's rubric differs (Mind2Web-2 critical-node gating × WideSearch cell-level F1).
+    Filling and verification are deliberately <b>asymmetric</b> — separate Copilot sessions.
+    Tier A (deterministic, replayable from frozen snapshots) vs Tier B (LLM playbook, anti-scrape) keep dynamic ground truth maintainable.
+    Generated from a static read of <code>custom_benchmark/</code> on 2026-06-18.
+  </div>
+
+</div>
+</body>
+</html>

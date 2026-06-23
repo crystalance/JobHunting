@@ -8,6 +8,19 @@
 
 ## BQ questions
 ### HDMAS
+
+#### problems&fix
+1. when multiple agents doing one thing, file conflict is common: 
+    1. my solution is using a lock // lock BB for reading and writing, lock other files
+    2. the common solution is using git worktree --> how?
+    3. 
+
+2. when you are having a loop engineering or multiple agents doing a loop, using a independent review agent to check is improtant
+    1. 
+
+
+
+
 ### BenchmarkBuildingPipeline
 1. verification rate is low--> how to enhance it while remain trustworthy?
 2. how to enhance GT agents ability, incase the benchmark is too simple?
@@ -83,4 +96,6 @@ I can wire up that gap experiment in your repo right now — run the GT model th
         4. 
 
 7. histroy bugs and fixtions
-    1. 
+#### problems encountered
+1. for case 2 fact, when extracting instance, the instance is always a mess...
+2. 

@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BenchAgents — Paper Notes &amp; Mapping to the Benchmark Pipeline</title>
+<style>
+  :root{
+    --ink:#1b1f24; --muted:#57606a; --line:#c4ccd4;
+    --blue:#0969da; --blue-bg:#ddf4ff;
+    --green:#1a7f37; --green-bg:#dafbe1;
+    --orange:#bc4c00; --orange-bg:#fff1e5;
+    --purple:#8250df; --purple-bg:#f3eefc;
+    --red:#cf222e; --red-bg:#ffebe9;
+    --yellow:#9a6700; --yellow-bg:#fff8c5;
+    --card:#fff;
+  }
+  *{box-sizing:border-box}
+  body{font-family:-apple-system,"Segoe UI","Microsoft YaHei",Roboto,Helvetica,Arial,sans-serif;
+    color:var(--ink);background:#f4f6f8;margin:0;padding:34px 20px 90px;line-height:1.55}
+  .wrap{max-width:1080px;margin:0 auto}
+  h1{font-size:26px;margin:0 0 4px;border-bottom:3px solid var(--purple);padding-bottom:10px}
+  .src{color:var(--muted);font-size:13.5px;margin:8px 0 4px}
+  .src a{color:var(--blue);text-decoration:none}
+  .src a:hover{text-decoration:underline}
+  .lead{font-size:15px;color:#2c333b;background:var(--purple-bg);border-left:4px solid var(--purple);
+    padding:12px 16px;border-radius:6px;margin:18px 0 30px}
+  h2{font-size:20px;margin:34px 0 14px;padding-bottom:7px;border-bottom:1px solid #e3e7eb;display:flex;align-items:center;gap:10px}
+  h2 .n{font-size:13px;font-weight:700;color:#fff;background:var(--purple);border-radius:20px;padding:2px 11px;flex:0 0 auto}
+  h3{font-size:15.5px;margin:22px 0 8px}
+  p{margin:0 0 12px;font-size:14px}
+  code{font-family:"Cascadia Code",Consolas,monospace;background:#eef1f4;padding:1px 6px;border-radius:4px;font-size:12.5px}
+  ul{margin:0 0 14px;padding-left:22px}
+  li{font-size:14px;margin:5px 0}
+  table{border-collapse:collapse;width:100%;margin:14px 0;font-size:13.3px}
+  th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+  th{background:#f0f3f6}
+  td code,th code{font-size:12px}
+  .agents{display:flex;flex-wrap:wrap;align-items:stretch;gap:0;margin:16px 0}
+  .ag{flex:1 1 170px;min-width:155px;background:var(--card);border:1.5px solid var(--line);border-radius:9px;padding:11px 13px}
+  .ag h4{margin:0 0 5px;font-size:13.5px}
+  .ag .who{font-size:11px;font-weight:700;color:#fff;border-radius:10px;padding:1px 8px;display:inline-block;margin-bottom:6px}
+  .ag p{margin:0;font-size:12px;color:#3a4350}
+  .arr{display:flex;align-items:center;justify-content:center;flex:0 0 24px;color:var(--muted);font-size:19px;font-weight:700}
+  .w-p{background:#8250df}.w-g{background:#1a7f37}.w-v{background:#bc4c00}.w-e{background:#0969da}
+  .key{background:var(--green-bg);border-left:4px solid var(--green);padding:12px 16px;border-radius:6px;margin:16px 0;font-size:14px}
+  .gap{background:var(--orange-bg);border-left:4px solid var(--orange);padding:12px 16px;border-radius:6px;margin:16px 0}
+  .gap b{color:var(--orange)}
+  .quote{background:#f6f8fa;border-left:4px solid var(--purple);padding:12px 16px;border-radius:6px;margin:16px 0;font-style:italic;font-size:14px;color:#33383f}
+  .pill-row{display:flex;flex-wrap:wrap;gap:10px;margin:14px 0}
+  .pill{border-radius:10px;padding:10px 14px;font-size:13px;border:1.5px solid var(--line);background:var(--card);flex:1 1 230px}
+  .pill b{display:block;margin-bottom:3px}
+  .toc{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 20px;margin:0 0 26px}
+  .toc b{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+  .toc ol{margin:8px 0 0;padding-left:20px}
+  .toc a{color:var(--blue);text-decoration:none;font-size:14px}
+  .toc a:hover{text-decoration:underline}
+  .tag{display:inline-block;font-size:10.5px;font-weight:700;padding:1px 7px;border-radius:10px;text-transform:uppercase;letter-spacing:.4px}
+  .t-code{background:#e3e8ee;color:#445}
+  .t-llm{background:#ffe8c2;color:#9a6700}
+  .badge{display:inline-block;font-size:11px;font-weight:600;background:var(--blue-bg);color:var(--blue);border-radius:10px;padding:2px 9px;margin-right:6px}
+  .footer{margin-top:40px;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:14px}
+  .footer a{color:var(--blue);text-decoration:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>BenchAgents — Multi-Agent Systems for Structured Benchmark Creation</h1>
+  <p class="src">Paper: <a href="https://arxiv.org/html/2410.22584v2">arXiv 2410.22584v2</a> ·
+  Butt, Chandrasekaran, Joshi, <b>Nushi, Balachandran</b> · University of Amsterdam + <b>Microsoft Research</b> (Oct 2025) ·
+  Related: <a href="evals_for_agents_notes.html">evals_for_agents_notes.html</a> · <a href="../benchmark_pipeline_flowchart.html">benchmark_pipeline_flowchart.html</a></p>
+
+  <p class="lead">
+    <b>One line.</b> BenchAgents automates the <i>whole</i> benchmark-creation lifecycle —
+    <b>plan → generate → verify → evaluate</b>, one LLM agent per stage, gated by human feedback —
+    yielding diverse, hard, <i>validated</i> benchmarks at scale. It is the academic, synthetic-generation
+    cousin of my <code>custom_benchmark</code> pipeline; the key difference is they construct ground truth
+    by design, whereas my work solves the harder <b>live-web ground-truth + freshness</b> problem.
+  </p>
+
+  <div class="toc">
+    <b>Contents</b>
+    <ol>
+      <li><a href="#what">What they did (problem &amp; contribution)</a></li>
+      <li><a href="#how">How — the 4-agent architecture</a></li>
+      <li><a href="#valid">How they proved it works</a></li>
+      <li><a href="#insights">Model-analysis insights</a></li>
+      <li><a href="#map">Mapping to my pipeline</a></li>
+      <li><a href="#learn">What we can learn / adopt</a></li>
+      <li><a href="#beyond">Where my work goes further</a></li>
+    </ol>
+  </div>
+
+  <!-- 1 -->
+  <h2 id="what"><span class="n">1</span> What they did — problem &amp; contribution</h2>
+  <p><b>Problem.</b> Benchmarks bottleneck model understanding, but they <b>saturate</b> fast, get <b>contaminated</b>
+  (train/test overlap), and are <b>slow + expensive</b> to hand-build. Prior auto-generation doesn't generalize:
+  it needs custom prompt templates, domain-specific programmatic workflows, or a <b>seed dataset</b> to bootstrap.</p>
+  <p><b>Contribution.</b> <b>BenchAgents</b> — a general multi-agent LLM framework that automates benchmark creation
+  while inherently ensuring data + metric quality, with a human "developer" in the loop. It outputs
+  <b>(i) diverse, verified instances</b> and <b>(ii) executable evaluation code + metrics</b>.</p>
+  <p>Generality is shown across language <i>and</i> vision via three new benchmarks:</p>
+  <ul>
+    <li><span class="badge">BA-Calendar</span> 2,000 instances — calendar scheduling / planning under constraints.</li>
+    <li><span class="badge">BA-Text</span> 2,000 instances — long-form text generation under complex content constraints.</li>
+    <li><span class="badge">BA-Causal</span> 500 instances — visual causal reasoning over 2D PyMunk physics simulations.</li>
+  </ul>
+
+  <!-- 2 -->
+  <h2 id="how"><span class="n">2</span> How — the 4-agent architecture</h2>
+  <p>Decompose benchmark creation into 4 stages, one agent each, orchestrated by the planner, gated by human feedback. All powered by GPT-4o.</p>
+
+  <div class="agents">
+    <div class="ag"><span class="who w-p">P-Agent</span><h4>Planning</h4><p>From a one-line NL request, decomposes into 3 sub-plans: generation params/constraints + tools; verification checks; evaluation metrics &amp; disaggregations.</p></div>
+    <div class="arr">→</div>
+    <div class="ag"><span class="who w-g">G-Agent</span><h4>Generation <span class="tag t-code">code</span></h4><p>Writes executable code. Samples structured metadata <i>first</i>, then fills static templates (consistency) or prompts an LLM (diversity); can call tools (PyMunk). Instance = (prompt, params, constraints).</p></div>
+    <div class="arr">→</div>
+    <div class="ag"><span class="who w-v">V-Agent</span><h4>Verification</h4><p>Instance-level checks as code or prompts. Filters out anything failing any check — the filter <i>is</i> the quality guarantee.</p></div>
+    <div class="arr">→</div>
+    <div class="ag"><span class="who w-e">E-Agent</span><h4>Evaluation</h4><p>Writes scoring code/prompts. Handles open-ended output by mixing programmatic metrics + LLM-as-judge.</p></div>
+  </div>
+  <p style="font-size:12.5px;color:var(--muted)">Developer-in-the-loop at every stage reviews &amp; edits plans and generated code.</p>
+
+  <h3>V-Agent's five quality checks (reusable rubric)</h3>
+  <table>
+    <tr><th>Check</th><th>Meaning</th></tr>
+    <tr><td><b>Clarity</b></td><td>Instance is understandable / unambiguous to developers and models.</td></tr>
+    <tr><td><b>Completeness</b></td><td>Contains all parameters &amp; constraints from the sampled metadata.</td></tr>
+    <tr><td><b>Consistency</b></td><td>Realized values match the metadata (e.g. # participants in schedule = param).</td></tr>
+    <tr><td><b>Feasibility</b></td><td>Constraints admit ≥ 1 valid solution.</td></tr>
+    <tr><td><b>Complexity</b></td><td>A task-specific difficulty score (e.g. constrainedness = 1 − feasible/total slots).</td></tr>
+  </table>
+
+  <!-- 3 -->
+  <h2 id="valid"><span class="n">3</span> How they proved it works</h2>
+  <ul>
+    <li><b>Checks are trustworthy</b> — V-Agent vs. human annotations on 50 pre-filter instances agree highly (clarity 0.96–0.99, completeness 0.90–0.96). The automated filter ≈ human judgment.</li>
+    <li><b>Instances are high quality</b> — high post-filter pass rates; BA-Causal is "correct by construction" (deterministic sim).</li>
+    <li><b>Diverse</b> — broader parameter coverage than human-curated <b>NaturalPlan</b> (more participants/days + a novel buffer-time constraint).</li>
+    <li><b>Hard &amp; solvable</b> — accuracy drops <b>monotonically</b> as their complexity metric rises (valid difficulty proxy); human baseline 85% (Calendar) / 97.5% (Causal) confirms solvability.</li>
+    <li><b>Developer effort quantified</b> (Appendix H, edit-distance pre/post feedback): Calendar needed heavy <i>plan</i> edits for logical constraint parsing; Causal needed little plan editing but heavy <i>code</i> editing for the physics sim → for tool-heavy tasks, effort shifts from planning to implementation correctness.</li>
+  </ul>
+
+  <!-- 4 -->
+  <h2 id="insights"><span class="n">4</span> Model-analysis insights (the payoff)</h2>
+  <div class="pill-row">
+    <div class="pill"><b>Reasoning ≫ non-reasoning</b>on scheduling &amp; constrained writing — and the gap <i>widens with complexity</i> (they self-verify &amp; re-attempt).</div>
+    <div class="pill"><b>Negation is a universal weakness</b>all models struggle to <i>exclude</i> specified content (negative constraints).</div>
+    <div class="pill"><b>Vision is the bottleneck, not reasoning</b>same causal scene as <i>text</i> → near-perfect; as <i>images</i> → collapses. Limitation is multimodal grounding.</div>
+  </div>
+
+  <!-- 5 -->
+  <h2 id="map"><span class="n">5</span> Mapping to my benchmark pipeline</h2>
+  <p>The 4-agent skeleton maps almost 1:1 onto <code>custom_benchmark</code>:</p>
+  <table>
+    <tr><th>BenchAgents</th><th>My pipeline</th></tr>
+    <tr><td><b>P-Agent</b> — plan params / constraints / metrics</td><td><code>query2facts</code> — extract facts, identity_keys, refresh tier, scoring scheme</td></tr>
+    <tr><td><b>G-Agent</b> — sample metadata → generate instances</td><td><code>ground_truth_agent</code> dispatcher + GT-Agent (fill instances from spec)</td></tr>
+    <tr><td><b>V-Agent</b> — 5 checks, filter failures</td><td><b>Verifier</b> (independent re-fetch, <code>verified</code> flag) + <code>repair</code></td></tr>
+    <tr><td><b>E-Agent</b> — programmatic + LLM-judge metrics</td><td><code>framework/grader</code> + <code>log2answer</code></td></tr>
+    <tr><td><b>Developer-in-the-loop</b></td><td>human skill-promotion + repair / transcript review</td></tr>
+  </table>
+
+  <!-- 6 -->
+  <h2 id="learn"><span class="n">6</span> What we can learn / adopt</h2>
+  <ol>
+    <li><b>Generate from structured metadata, not free-form.</b> Sample params/constraints first, then realize the instance — gives provable diversity &amp; coverage. Add explicit <b>parameter-coverage reporting</b> to my pipeline.</li>
+    <li><b>Make verification a first-class agent with named criteria.</b> Borrow <b>feasibility</b> ("does a verifiable answer exist?") and <b>consistency</b> ("realized instance matches metadata?") on top of my value-correctness checks.</li>
+    <li><b>Filtering is the quality guarantee.</b> Over-generate + aggressively discard anything failing any check. Consider a discard-vs-repair policy (they discard; I repair).</li>
+    <li><b>Calibrate automated checks against humans — and report the agreement number.</b> Run a small annotator study on my Verifier to earn a credibility figure (same principle as the Anthropic eval article).</li>
+    <li><b>A difficulty metric doubles as a coverage axis and a validity proof.</b> Add a per-case difficulty score so the benchmark visibly discriminates between models.</li>
+    <li><b>Quantify human effort to argue scalability.</b> Log how much manual skill-promotion/repair editing is needed (their edit-distance trick).</li>
+    <li><b>Design decomposing ablations.</b> Their text-vs-image ablation isolated perception from reasoning. Analogue for me: give the agent the gold evidence page directly vs. make it search — isolating <i>retrieval</i> failure from <i>extraction</i> failure.</li>
+  </ol>
+
+  <!-- 7 -->
+  <h2 id="beyond"><span class="n">7</span> Where my work goes further</h2>
+  <div class="gap">
+    <b>BenchAgents generates synthetic, self-contained tasks where ground truth is constructed by design</b> — the answer is known the moment the instance is built, and there is <b>no notion of staleness</b>.
+    My hard problem is the opposite: ground truth lives on the <b>live web</b>, so my pipeline needs
+    <b>web-search filling, independent URL verification, binary/JS-render handling, and a <code>refresh</code>/drift maintenance loop</b> that re-derives dynamic facts at evaluation time.
+    Their tasks are single-turn and closed; mine target agentic, open-web tasks. The <code>refresh</code> stage is a genuinely harder problem they explicitly avoid.
+  </div>
+
+  <div class="quote" style="border-left-color:var(--green)">
+    Takeaway: decomposing benchmark creation into <b>plan → generate → verify → evaluate</b> agents (gated by human feedback)
+    produces validated benchmarks at scale; the trustworthiness levers are <b>structured-metadata sampling</b>,
+    <b>aggressive filtering on named quality checks</b>, and <b>calibrating automated checks against humans</b>.
+    My pipeline mirrors this skeleton — its differentiator is solving live-web ground truth + freshness.
+  </div>
+
+  <div class="footer">
+    Notes compiled 2026-06-22 from <a href="https://arxiv.org/html/2410.22584v2">arXiv 2410.22584v2</a>, mapped onto <code>custom_benchmark/</code>.
+    See also <a href="evals_for_agents_notes.html">evals_for_agents_notes.html</a> and <a href="../benchmark_pipeline_flowchart.html">benchmark_pipeline_flowchart.html</a>.
+  </div>
+
+</div>
+</body>
+</html>

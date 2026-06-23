@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Evals for AI Agents — Notes & Mapping to the Benchmark Pipeline</title>
+<style>
+  :root{
+    --ink:#1b1f24; --muted:#57606a; --line:#c4ccd4;
+    --blue:#0969da; --blue-bg:#ddf4ff;
+    --green:#1a7f37; --green-bg:#dafbe1;
+    --orange:#bc4c00; --orange-bg:#fff1e5;
+    --purple:#8250df; --purple-bg:#f3eefc;
+    --red:#cf222e; --red-bg:#ffebe9;
+    --yellow:#9a6700; --yellow-bg:#fff8c5;
+    --card:#fff;
+  }
+  *{box-sizing:border-box}
+  body{font-family:-apple-system,"Segoe UI","Microsoft YaHei",Roboto,Helvetica,Arial,sans-serif;
+    color:var(--ink);background:#f4f6f8;margin:0;padding:34px 20px 90px;line-height:1.55}
+  .wrap{max-width:1080px;margin:0 auto}
+  h1{font-size:27px;margin:0 0 4px;border-bottom:3px solid var(--blue);padding-bottom:10px}
+  .src{color:var(--muted);font-size:13.5px;margin:8px 0 4px}
+  .src a{color:var(--blue);text-decoration:none}
+  .src a:hover{text-decoration:underline}
+  .lead{font-size:15px;color:#2c333b;background:var(--blue-bg);border-left:4px solid var(--blue);
+    padding:12px 16px;border-radius:6px;margin:18px 0 30px}
+  h2{font-size:20px;margin:34px 0 14px;padding-bottom:7px;border-bottom:1px solid #e3e7eb;display:flex;align-items:center;gap:10px}
+  h2 .n{font-size:13px;font-weight:700;color:#fff;background:var(--blue);border-radius:20px;padding:2px 11px;flex:0 0 auto}
+  h3{font-size:15.5px;margin:22px 0 8px}
+  p{margin:0 0 12px;font-size:14px}
+  code{font-family:"Cascadia Code",Consolas,monospace;background:#eef1f4;padding:1px 6px;border-radius:4px;font-size:12.5px}
+  ul{margin:0 0 14px;padding-left:22px}
+  li{font-size:14px;margin:5px 0}
+  .pill-row{display:flex;flex-wrap:wrap;gap:10px;margin:14px 0}
+  .pill{border-radius:10px;padding:10px 14px;font-size:13px;border:1.5px solid var(--line);background:var(--card);flex:1 1 220px}
+  .pill b{display:block;margin-bottom:3px}
+  table{border-collapse:collapse;width:100%;margin:14px 0;font-size:13.3px}
+  th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+  th{background:#f0f3f6}
+  td code,th code{font-size:12px}
+  .card{background:var(--card);border:1.5px solid var(--line);border-radius:10px;padding:16px 18px;margin:14px 0}
+  .flow{display:flex;flex-wrap:wrap;align-items:stretch;gap:0;margin:14px 0}
+  .step{flex:1 1 150px;min-width:140px;background:var(--card);border:1.5px solid var(--line);border-radius:9px;padding:10px 12px}
+  .step h4{margin:0 0 5px;font-size:13px;color:var(--green)}
+  .step p{margin:0;font-size:12px;color:#3a4350}
+  .arr{display:flex;align-items:center;justify-content:center;flex:0 0 26px;color:var(--muted);font-size:20px;font-weight:700}
+  .key{background:var(--green-bg);border-left:4px solid var(--green);padding:12px 16px;border-radius:6px;margin:16px 0;font-size:14px}
+  .gap{background:var(--orange-bg);border-left:4px solid var(--orange);padding:12px 16px;border-radius:6px;margin:16px 0}
+  .gap b{color:var(--orange)}
+  .quote{background:#f6f8fa;border-left:4px solid var(--purple);padding:12px 16px;border-radius:6px;margin:16px 0;font-style:italic;font-size:14px;color:#33383f}
+  .tag{display:inline-block;font-size:10.5px;font-weight:700;padding:1px 7px;border-radius:10px;text-transform:uppercase;letter-spacing:.4px;vertical-align:middle}
+  .t-code{background:#e3e8ee;color:#445}
+  .t-llm{background:#ffe8c2;color:#9a6700}
+  .t-human{background:#f3d6ff;color:#8250df}
+  .toc{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 20px;margin:0 0 26px}
+  .toc b{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+  .toc ol{margin:8px 0 0;padding-left:20px}
+  .toc a{color:var(--blue);text-decoration:none;font-size:14px}
+  .toc a:hover{text-decoration:underline}
+  .footer{margin-top:40px;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Evals for AI Agents — Notes &amp; Mapping to My Benchmark Pipeline</h1>
+  <p class="src">Source article: <a href="https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents">Demystifying evals for AI agents — Anthropic Engineering</a> (Jan 09, 2026) ·
+  Related: <a href="benchmark_pipeline_flowchart.html">benchmark_pipeline_flowchart.html</a></p>
+
+  <p class="lead">
+    <b>Core thesis.</b> The same traits that make agents useful — autonomy, intelligence, flexibility over many turns —
+    make them hard to evaluate. Good <b>automated evals</b> turn “the agent feels worse” into something measurable,
+    and their value <b>compounds</b> over the agent's lifecycle. My work automates the layer <i>above</i> the harness:
+    generating and maintaining the benchmark itself.
+  </p>
+
+  <div class="toc">
+    <b>Contents</b>
+    <ol>
+      <li><a href="#idea">Main idea, linked by logic</a></li>
+      <li><a href="#auto">What “automated evals” means &amp; how it's automated</a></li>
+      <li><a href="#map">How it maps to my benchmark pipeline</a></li>
+      <li><a href="#beyond">Where my work goes beyond the article</a></li>
+      <li><a href="#gaps">Gaps the article suggests I add</a></li>
+      <li><a href="#pitch">One-line framing</a></li>
+    </ol>
+  </div>
+
+  <!-- ============ 1 ============ -->
+  <h2 id="idea"><span class="n">1</span> Main idea, linked by logic</h2>
+  <p>The article is one argument chain — each part motivates the next:</p>
+
+  <div class="flow">
+    <div class="step"><h4>① Problem</h4><p>Agents act over many turns → mistakes propagate. Without evals you're in a reactive loop (wait for complaints → fix → hope).</p></div>
+    <div class="arr">→</div>
+    <div class="step"><h4>② Vocabulary</h4><p>Eval = input → grading logic → success. Primitives: task, trial, grader, transcript, outcome, harness, suite.</p></div>
+    <div class="arr">→</div>
+    <div class="step"><h4>③ Payoff</h4><p>Specifies success, enables fast model upgrades, free baselines, product↔research channel. Cost upfront, value compounds.</p></div>
+    <div class="arr">→</div>
+    <div class="step"><h4>④ Toolkit</h4><p>3 grader types · capability vs regression · per agent-type recipes · non-determinism metrics.</p></div>
+    <div class="arr">→</div>
+    <div class="step"><h4>⑤ Roadmap</h4><p>Steps 0–8: start small, unambiguous tasks, balanced sets, clean harness, read transcripts.</p></div>
+    <div class="arr">→</div>
+    <div class="step"><h4>⑥ Zoom out</h4><p>Evals are one layer (Swiss-cheese) with monitoring, A/B, user feedback, human review.</p></div>
+  </div>
+
+  <p class="quote">Reactive debugging doesn't scale for multi-turn agents (1) → so define success precisely with shared primitives (2)
+  because the payoff compounds (3) → assemble the right graders, purposes, and metrics per agent type (4) → via a
+  start-small-and-iterate roadmap whose linchpin is <b>reading transcripts</b> (5) → as one layer in a defense-in-depth system (6).</p>
+
+  <!-- ============ 2 ============ -->
+  <h2 id="auto"><span class="n">2</span> What “automated evals” means &amp; how it's automated</h2>
+  <p>The article explicitly scopes itself to <b>automated evals — “run during development without real users.”</b>
+  The automation lives in two places: the <b>harness</b> (orchestration) and the <b>graders</b> (scoring).</p>
+
+  <h3>Where: the evaluation harness</h3>
+  <p>Infrastructure that runs evals end-to-end — it automatically: provides instructions + tools, <b>runs tasks concurrently</b>,
+  <b>records all steps</b> (the transcript), <b>grades outputs</b>, and <b>aggregates results</b>. It runs the
+  <i>agent harness / scaffold</i> (model + tool orchestration) over <b>many trials</b> per task, because outputs are non-deterministic.</p>
+
+  <h3>How: the graders (two of three are automatable)</h3>
+  <table>
+    <tr><th>Grader</th><th>How it automates</th><th>Trade-off</th></tr>
+    <tr><td><span class="tag t-code">code</span> Code-based</td><td>String/regex/fuzzy match, binary unit tests (fail-to-pass), static analysis, outcome/state check, tool-call &amp; transcript checks</td><td>Fast, cheap, reproducible — but brittle to valid variation</td></tr>
+    <tr><td><span class="tag t-llm">llm</span> Model-based (LLM-as-judge)</td><td>Rubrics, natural-language assertions, pairwise comparison — automates subjective/open-ended grading</td><td>Non-deterministic; must be <b>calibrated against humans</b></td></tr>
+    <tr><td><span class="tag t-human">human</span> Human</td><td><i>Not</i> automated — used only to calibrate the LLM judges, then occasional review</td><td>Gold standard but slow/expensive</td></tr>
+  </table>
+
+  <h3>Where in the workflow it runs</h3>
+  <ul>
+    <li><b>Pre-launch &amp; CI/CD</b> — “runs on each agent change and model upgrade,” the <i>first line of defense</i> (“can run on every commit”).</li>
+    <li><b>Free baselines/regression</b> — latency, token usage, cost per task, error rates on a static task bank.</li>
+    <li><b>Capability vs regression suites</b> — a saturated capability suite “graduates” into a continuously-run regression suite.</li>
+  </ul>
+
+  <div class="gap"><b>Caveats on automation.</b> Reproducibility needs a <b>clean, isolated environment</b> per trial (leftover state → correlated/fake results).
+  Automated scores can be silently wrong (Opus 4.5: 42% → 95% on CORE-Bench after fixing grading bugs) → <b>don't trust scores until someone reads transcripts.</b>
+  It's one layer, not the whole picture.</div>
+
+  <!-- ============ 3 ============ -->
+  <h2 id="map"><span class="n">3</span> How it maps to my benchmark pipeline</h2>
+  <p>My <code>custom_benchmark</code> is an automated implementation of the article's vocabulary and roadmap — its terms map onto my artifacts almost 1:1:</p>
+  <table>
+    <tr><th>Article term</th><th>My pipeline</th></tr>
+    <tr><td><b>Task</b> (input + success criteria)</td><td><code>fact_spec_template.json</code> — a case's facts + identity_keys</td></tr>
+    <tr><td><b>Outcome</b> (real end-state, not the claim)</td><td>per-instance <code>value</code> + <code>evidence_url</code> in <code>fact_spec_gold.json</code></td></tr>
+    <tr><td><b>Grader / assertions</b></td><td><code>framework/rubric.py</code> primitives: <code>numeric_band</code>, <code>exact_string</code>, <code>url_in_set</code>…</td></tr>
+    <tr><td><b>Transcript / trace</b></td><td><code>agent_trace.json</code>, and <code>log2answer</code>'s <code>extract_input.json</code></td></tr>
+    <tr><td><b>Eval harness</b></td><td><code>run_experiment.py</code></td></tr>
+    <tr><td><b>Agent harness (scaffold)</b></td><td><code>agents/baseline_agent.py</code> (the thing under test)</td></tr>
+    <tr><td><b>Eval suite</b></td><td><code>cases/advanced_cases_50/</code></td></tr>
+  </table>
+
+  <div class="key"><b>Design choices that match the article's grader principles:</b>
+  <ul>
+    <li><b>Deterministic where possible, LLM where necessary, human judiciously</b> → deterministic scoring engine; LLM/agent for gold construction; humans only promote skills.</li>
+    <li><b>Grade what's produced, not the path</b> → rubric scores final cell values, not the search trajectory.</li>
+    <li><b>Independent / calibrated judging + check the outcome not the claim</b> → isolated <b>Verifier</b> session re-fetches the cited URL independently.</li>
+    <li><b>Handle shifting ground truth &amp; source quality</b> → per-type verifier routing (binary / JS-render / corroboration) + refresh drift guardrails.</li>
+  </ul></div>
+
+  <!-- ============ 4 ============ -->
+  <h2 id="beyond"><span class="n">4</span> Where my work goes beyond the article</h2>
+  <p>The article's roadmap assumes <b>humans</b> write tasks (Step 1) and reference solutions (Step 2).
+  My <b>query2facts → ground_truth_agent</b> stages <b>automate that authoring step itself</b> — the key contribution:</p>
+  <div class="pill-row">
+    <div class="pill"><b>query2facts = automated task spec</b>Turns raw query + workbook into atomic, verifiable facts. The reviewer minimizing <code>identity_keys</code> mechanizes the article's “unambiguous task” rule (two experts agree).</div>
+    <div class="pill"><b>ground_truth_agent = automated reference solution</b>Web-searches + independently verifies gold. The fill → verify → repair loop <i>is</i> the article's “prove the task is solvable &amp; graders are configured” step — done by machine.</div>
+    <div class="pill"><b>refresh = drift maintenance</b>Article warns research-agent ground truth “shifts as reference content changes.” My Tier A replay / Tier B live + drift verification is a concrete automated answer most teams skip.</div>
+  </div>
+
+  <!-- ============ 5 ============ -->
+  <h2 id="gaps"><span class="n">5</span> Gaps the article suggests I add</h2>
+  <p>Each improvement below is citable to the blog:</p>
+  <ul>
+    <li><b>Multiple trials + pass@k / pass^k.</b> Agents are non-deterministic; grade over k trials. <code>pass@k</code> when one success matters; <code>pass^k</code> when consistency matters.</li>
+    <li><b>Capability vs regression split.</b> Tag cases: capability (hard, low pass rate) vs regression (~100%, every change). My <code>_regression.json</code> already hints at this.</li>
+    <li><b>Balanced / negative cases.</b> Avoid one-sided evals (the web-search over-triggering story) — add cases where the answer is already in the workbook and the agent should <i>not</i> search.</li>
+    <li><b>Explicit partial credit.</b> Per-instance F1-style scoring already supports it — surface it instead of pure binary.</li>
+    <li><b>“Read the transcripts.”</b> Frame <code>repair.py</code> triage + logs as the transcript-review / calibration loop (the article's #1 rule).</li>
+    <li><b>CI/CD framing.</b> Position the pipeline as a CI-runnable regression gate, not a one-off generator — matching the “runs on every commit” definition.</li>
+  </ul>
+
+  <!-- ============ 6 ============ -->
+  <h2 id="pitch"><span class="n">6</span> One-line framing</h2>
+  <div class="quote" style="border-left-color:var(--green)">
+    The Anthropic piece describes automated evaluation as an eval harness that runs an agent scaffold over many trials and
+    grades outputs with deterministic + LLM judges. <b>My work automates the layer above that</b> — generating and maintaining
+    the benchmark itself: an LLM pipeline that turns raw queries into unambiguous, verifiable tasks (<code>query2facts</code>),
+    web-searches and independently verifies ground truth (<code>ground_truth_agent</code>), keeps dynamic facts fresh against
+    drift (<code>refresh</code>), then scores any candidate agent with a shared deterministic rubric (<code>framework</code>) —
+    i.e. <b>eval-driven development where the eval set is itself produced and maintained by agents.</b>
+  </div>
+
+  <div class="footer">
+    Notes compiled 2026-06-22 from the Anthropic article, mapped onto <code>custom_benchmark/</code>.
+    See the pipeline diagram in <a href="benchmark_pipeline_flowchart.html">benchmark_pipeline_flowchart.html</a>.
+  </div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>小红书 Google / Amazon SDE 面经汇总（近 6 个月）</title>
+<style>
+  :root {
+    --google-blue: #4285f4;
+    --google-red: #ea4335;
+    --google-yellow: #fbbc05;
+    --google-green: #34a853;
+    --amazon-orange: #ff9900;
+    --amazon-dark: #232f3e;
+    --bg: #f6f8fa;
+    --card-bg: #ffffff;
+    --text: #1f2328;
+    --text-muted: #57606a;
+    --border: #d0d7de;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+      "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif;
+    line-height: 1.7;
+    color: var(--text);
+    background: var(--bg);
+    margin: 0;
+    padding: 0;
+  }
+  .wrapper { max-width: 960px; margin: 0 auto; padding: 32px 20px 80px; }
+  header.page-header {
+    background: linear-gradient(135deg, #4285f4 0%, #34a853 50%, #ff9900 100%);
+    color: #fff;
+    padding: 40px 32px;
+    border-radius: 16px;
+    margin-bottom: 28px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  }
+  header.page-header h1 { margin: 0 0 12px; font-size: 28px; line-height: 1.4; }
+  header.page-header .meta { font-size: 13.5px; opacity: 0.95; }
+  header.page-header .meta div { margin: 3px 0; }
+  header.page-header code {
+    background: rgba(255,255,255,0.22);
+    padding: 1px 6px; border-radius: 4px; font-size: 12.5px;
+  }
+  .intro {
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 18px; margin-bottom: 32px;
+    font-size: 14px; color: var(--text-muted);
+  }
+  h2.section {
+    font-size: 22px; margin: 40px 0 20px; padding-bottom: 10px;
+    border-bottom: 3px solid var(--border); display: flex; align-items: center; gap: 10px;
+  }
+  h2.google-section { border-color: var(--google-blue); }
+  h2.amazon-section { border-color: var(--amazon-orange); }
+  h2.summary-section { border-color: var(--google-green); }
+  .badge {
+    display: inline-block; font-size: 12px; font-weight: 700; color: #fff;
+    padding: 2px 10px; border-radius: 20px; letter-spacing: 0.5px;
+  }
+  .badge.google { background: var(--google-blue); }
+  .badge.amazon { background: var(--amazon-orange); }
+  .card {
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: 12px; padding: 22px 26px; margin-bottom: 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    transition: box-shadow 0.2s, transform 0.2s;
+  }
+  .card:hover { box-shadow: 0 6px 18px rgba(0,0,0,0.10); transform: translateY(-2px); }
+  .card.google { border-left: 5px solid var(--google-blue); }
+  .card.amazon { border-left: 5px solid var(--amazon-orange); }
+  .card h3 { margin: 0 0 10px; font-size: 18px; }
+  .card .author {
+    font-size: 13px; color: var(--text-muted); margin-bottom: 14px;
+    background: var(--bg); display: inline-block; padding: 3px 12px; border-radius: 16px;
+  }
+  .card p { margin: 8px 0; }
+  .card ul { margin: 8px 0; padding-left: 22px; }
+  .card li { margin: 5px 0; }
+  .label { font-weight: 700; color: var(--text); }
+  strong { color: #0a3069; }
+  .card.amazon strong { color: #8a5200; }
+  .source {
+    margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--border);
+    font-size: 13px; word-break: break-all;
+  }
+  .source a { color: var(--google-blue); text-decoration: none; }
+  .source a:hover { text-decoration: underline; }
+  code {
+    background: rgba(175,184,193,0.2); padding: 1px 5px;
+    border-radius: 5px; font-size: 13px;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  }
+  .summary-card {
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: 12px; padding: 22px 26px; margin-bottom: 22px;
+  }
+  .summary-card.google { border-top: 4px solid var(--google-blue); }
+  .summary-card.amazon { border-top: 4px solid var(--amazon-orange); }
+  .summary-card.common { border-top: 4px solid var(--google-green); }
+  .summary-card h3 { margin-top: 0; }
+  footer {
+    margin-top: 48px; padding-top: 20px; border-top: 1px solid var(--border);
+    font-size: 12.5px; color: var(--text-muted); text-align: center; font-style: italic;
+  }
+  .toc {
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: 12px; padding: 18px 24px; margin-bottom: 32px;
+  }
+  .toc h3 { margin: 0 0 10px; font-size: 16px; }
+  .toc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 24px; }
+  .toc a { color: var(--text-muted); text-decoration: none; font-size: 13.5px; }
+  .toc a:hover { color: var(--google-blue); }
+  @media (max-width: 640px) {
+    .toc-grid { grid-template-columns: 1fr; }
+    header.page-header h1 { font-size: 22px; }
+    .wrapper { padding: 18px 12px 60px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+  <header class="page-header">
+    <h1>小红书 Google / Amazon SDE 面经汇总（近 6 个月）</h1>
+    <div class="meta">
+      <div>数据来源：小红书 web 搜索结果，关键词 <code>google sde 面经</code> / <code>amazon sde 面经</code> / <code>亚麻 sde 面经</code></div>
+      <div>收录时间窗：2025-12-25 ~ 2026-06-25（按发布日期）</div>
+      <div>整理时间：2026-06-25</div>
+    </div>
+  </header>
+
+  <div class="intro">
+    每条均附原文出处链接，建议直接收藏对应小红书笔记原贴以备查。
+  </div>
+
+  <div class="toc">
+    <h3>目录</h3>
+    <div class="toc-grid">
+      <a href="#google">一、Google SDE 面经（G1–G14）</a>
+      <a href="#amazon">二、Amazon SDE 面经（A1–A12）</a>
+      <a href="#summary">三、共性观察 &amp; 通关建议</a>
+    </div>
+  </div>
+
+  <!-- ============ GOOGLE ============ -->
+  <h2 class="section google-section" id="google">
+    <span class="badge google">Google</span> 一、Google SDE 面经
+  </h2>
+
+  <div class="card google">
+    <h3>G1. Google SDE 面试凉经（Phone Screen + Onsite 4 轮）</h3>
+    <div class="author">作者 / 日期：青柠布丁 / 2026-04-20</div>
+    <p><span class="label">流程：</span>Phone Screen (Coding) → Onsite Coding ×3 → Onsite Culture &amp; Behavioural ×1</p>
+    <p><span class="label">LeetCode 题目：</span></p>
+    <ul>
+      <li>Phone Screen：<strong>打家劫舍</strong>（House Robber）变种</li>
+      <li>Onsite #1：<strong>课程表</strong>（Course Schedule）变种</li>
+      <li>Onsite #2：用<strong>字典树（Trie）实现文件系统</strong>的增删查改</li>
+      <li>Onsite #3：<strong>Bulls and Cows</strong> 进阶版</li>
+    </ul>
+    <p><span class="label">BQ 方向：</span>Why Google、Leadership、Teamwork、Problem Solving、Innovation —— 每个维度准备 1 个亲历小故事</p>
+    <p><span class="label">结论 / 经验：</span></p>
+    <ul>
+      <li>不考原题，题目都经过包装；</li>
+      <li>高度重视 OOP（先算法 → 再设计类封装算法）；</li>
+      <li>每题结束都会被问时空复杂度；</li>
+      <li>Coding 难度以 Medium 为主，但 Follow-up 难度较大；</li>
+      <li>凉在 Team Match（HC 通过但没匹配到组）。</li>
+    </ul>
+    <div class="source"><a href="https://www.xiaohongshu.com/explore/69e6083e00000000220258fe?xsec_token=ABlIUpaznGKXFG1JcNV6YJ3kmGD-Xv08yifxtWkZiKNGQ=" target="_blank" rel="noopener">原文链接 ↗</a></div>
+  </div>
+
+  <div class="card google">
+    <h3>G2. Google NG SDE TL + 面经（VO1 + Onsite）</h3>
+    <div class="author">作者 / 日期：小红薯69AB57CA / 2026-03-06</div>
+    <p><span class="label">Timeline：</span>10 月底投递（有内推）→ 11 月中 OA → 12 月中 VO1 → 2 月初 Onsite → 2 周后 HC pass → TM</p>
+    <p><span class="label">题目：</span></p>
+    <ul>
+      <li><strong>VO1 Tech</strong>：轻 OOD，实现一个 LLM Model：<code>init(corpus)</code> + <code>predict(word)</code>（返回语料中该 word 后面出现最多的词）。Follow-up：按概率输出。</li>
+      <li><strong>Onsite #1</strong>：实现 song shuffle，要求同一 artist 的歌 shuffle 后不能连续。</li>
+      <li><strong>Onsite #2</strong>：实现 SuperStack（pop / push / sum / <code>inc(k, index)</code> 给 0~index 的元素都加 k）。Follow-up：要求所有操作 O(1)。</li>
+    </ul>
+    <p><span class="label">BQ：</span>自我介绍、difficulty、conflict、fail to catch ddl、团队协作的假设场景题。</p>
+    <p><span class="label">总结：</span>Google 面试官多次强调 efficiency 不重要，沟通和 clarify 才是重点。</p>
+    <div class="source"><a href="https://www.xiaohongshu.com/explore/69ab53cc00000000290339b2?xsec_token=ABNdqqMWEA4cKow3pC5YqGGLBwxAO2rcYCSKlC7TYT9Vk=" target="_blank" rel="noopener">原文链接 ↗</a></div>
+  </div>
+
+  <div class="card google">
+    <h3>G3. Google SDE 26NG 过经（R1 干货）</h3>
+    <div class="author">作者 / 日期：爱喝冰美式 / 2026-02-28</div>
+    <p><span class="label">Timeline：</span>9/30 开岗当天投递 → 11/16 OA → 1/6 R1 → 1/8 R1 通过 → 1/15 Visa Call → 2/4 R2 Onsite（湾区）→ 2/24 进入 TM</p>
+    <p><span class="label">R1 Coding：</span><strong>设计餐厅 waitlist</strong>（高频题）</p>
+    <p><span class="label">R1 BQ（45 分钟，高强度）：</span></p>
+    <ul>
+      <li>tight deadline</li>
+      <li>too many work</li>
+      <li>a failure</li>
+      <li>work with colleagues who usually WFH</li>
+      <li>如何应对项目优先级频繁变化</li>
+      <li>good characteristics of a manager</li>
+      <li>initiate a project / feature</li>
+      <li>a change to your initial proposal</li>
+    </ul>
+    <p><span class="label">Tips：</span>先讲暴力解 + 时空复杂度 → 再讲优化思路 → 写代码加注释；BQ 答案要补足细节，否则会被连环追问。</p>
+    <div class="source"><a href="https://www.xiaohongshu.com/explore/69a3a938000000001d0279b8?xsec_token=ABLQM6Z3XZ8J36swcqQrMLGP9FxI6UAJ2LosaiEt9faE4=" target="_blank" rel="noopener">原文链接 ↗</a></div>
+  </div>
+
+  <div class="card google">
+    <h3>G4. Google 26NG SDE VO 三轮</h3>
+    <div class="author">作者 / 日期：我们不生产代码 / 2026-05-19</div>
+    <p><span class="label">BQ 高频题（同 G3 高度重叠）：</span>tight deadline、too many work、failure、WFH 同事、优先级变更、好 manager 的特质、initiate 项目、proposal 变更</p>
+    <p><span class="label">经验：</span>刷题量 500+，重点放沟通；先讲暴力 → 复杂度 → 优化思路 → 确认 → 写代码 + 注释。</p>
+    <div class="source"><a href="https://www.xiaohongshu.com/explore/6a0c2bdd0000000038037e3d?xsec_token=ABtyympDgroSscL9YdQftQDK8cN-BUkFbTy4VCPfUgz30=" target="_blank" rel="noopener">原文链接 ↗</a></div>
+  </div>
+
+  <div class="card google">
+    <h3>G5. Google 26NG SDE 过经 + Timeline</h3>
+    <div class="author">作者 / 日期：Lucas_oi / 2026-03-30</div>
+    <p><span class="label">Timeline：</span>10/02 投（无内推）→ 11/26 OA → 12/12 R1 → 12/19 通过 → 2/06 R2 Onsite（NYC）→ 3/03 Visa Check → 3/23 TM</p>
+    <p><span class="label">题目：</span></p>
+    <ul>
+      <li><strong>R1 Coding</strong>：<strong>OO Design + 找超时活动 ID</strong>。Log 文件未排序时 O(n log n)，排序好则 O(n)。</li>
+      <li><strong>R2 Coding #1</strong>：<strong>Rotate Matrix 变体</strong>（n × m），Follow-up 自己提 O(1) Space。</li>
+      <li><strong>R2 Coding #2</strong>：「尔伞散其」（应为某 Greedy 题），O(n) 贪心解，全程 line-by-line 边写边讲，无 follow-up。</li>
+    </ul>
+    <p><span class="label">R1 BQ：</span>地里准备即可。</p>
+    <div class="source"><a href="https://www.xiaohongshu.com/explore/69ca4ac20000000023013a2f?xsec_token=ABQ-LEFUctIq2PQR2nYuyUZT4RI6zvTb5NkGSd97j14VM=" target="_blank" rel="noopener">原文链接 ↗</a></div>
+  </div>
+
+  <div class="card google">
+    <h3>G6. 2026 Google NG TL + 完整面经</h3>
+    <div class="author">作者 / 日期：🤔 / 2026-03-12</div>
+    <p><span class="label">Timeline：</span>9/30 内推投递 → 11/19 HR Reachout → 12/16 R1 BQ+Coding → 12/30 R1 Pass → 1/28 R2 MTV Onsite → 2/23 TM → 3/12 Verbal Offer</p>
+    <p><span class="label">R1 BQ：</span></p>
+    <ul>
+      <li>你给团队带来过什么正面影响</li>
+      <li>你在 fix 一个项目时另一个项目又出问题，怎么处理</li>
+    </ul>
+    <p><span class="label">R1 Coding：</span></p>
+    <ul>
+      <li><strong>Number of Different Square Islands</strong></li>
+      <li>LeetCode <strong>一流其三 / 单调栈</strong>类</li>
+    </ul>
+    <p><span class="label">R2 Coding #1：</span>四 part 的「两幅手牌比大小」设计题（先比最大牌 → 平局比次大 → 引入新数值字符 → 比最大牌频率），重点考察数据结构 trade-off + 自己设计 testcase。</p>
+    <p><span class="label">R2 Coding #2：</span>一排 heights + sorted index list of fountains，fountain 会淹没低于自身 height 的格子但不能越过 ≥ 自身的，返回淹没 bitmask。</p>
+    <div class="source"><a href="https://www.xiaohongshu.com/explore/6998cde6000000002800b5dc?xsec_token=AB1afzoWRG5EFuJG4DR-uf0vsqVn5IUELtIecUPZeHI5k=" target="_blank" rel="noopener">原文链接 ↗</a></div>
+  </div>
+
+  <div class="card google">
+    <h3>G7. Google SWE 26NG R2 Onsite 面经</h3>
+    <div class="author">作者 / 日期：stella / 2026-02-11</div>
+    <p><span class="label">R2 #1：</span>给定一棵只知道 parent 的树，设计 <code>getRandomNode</code> + <code>createNode</code>。Follow-up：<code>getRandomLeafNode</code>、<code>remove</code>。</p>
+    <p><span class="label">R2 #2：</span>设计 <code>SecureLinkedList</code>，每个 Node 的 hash 由自身 value + 后一个节点 hash 决定（hash function 已给）。要求队首新增 Node + 验证整条 chain hash 合法。</p>
+    <div class="source"><a href="https://www.xiaohongshu.com/explore/698d4c87000000001d012d2a?xsec_token=AByej2pvM6NMgEcPwBUYqwb0yOf9w0qifaCrtrfMjNAeQ=" target="_blank" rel="noopener">原文链接 ↗</a></div>
+  </div>
+
+  <div class="card google">
+    <h3>G8. Google 26NG R2 挂经 — 文件与指令级联故障</h3>
+    <div class="author">作者 / 日期：momo / 2026-02-10</div>
+    <p><span class="label">题目：</span>「Doc &amp; Query Collapse」——</p>
+    <ul>
+      <li>系统中有 Document 和 Query，一对多双向包含。</li>
+      <li>初始一部分 Query 损坏；包含损坏 Query 的 Doc 损坏；Doc 损坏导致其内 Query 全部损坏；级联传播。</li>
+      <li>求最终所有损坏的 Document。</li>
+    </ul>
+    <p><span class="label">思路：</span>构建两个 hashmap（Doc→Queries、Query→Docs），BFS / 并查集。</p>
+    <div class="source"><a href="https://www.xiaohongshu.com/explore/698c0bb70000000016008157?xsec_token=ABQOB725kenhOd2LSPPOSsdggrEPP3JN_z9yYp7y94R14=" target="_blank" rel="noopener">原文链接 ↗</a></div>
+  </div>
+
+  <div class="card google">
+    <h3>G9. Google 26NG R2 挂经（屋顶修补题）</h3>
+    <div class="author">作者 / 日期：zzzzzz / 2026-02-06</div>
+    <p><span class="label">Timeline：</span>11/10 OA → 12/16 R1 → 12/17 R1 过 → 1/21 R2 → 2/5 挂</p>
+    <p><span class="label">R2 #1：</span>输入两数组 + k，处理 list2 让它前 k 个元素与 list1 前 k 个无重复，返回 list2。</p>
+    <p><span class="label">R2 #2：</span>m×n 数组表示屋顶，1 是好的、0 是漏洞，允许 1×m 或 1×n 木板修补，求最少木板数。<strong>答案：二分图匹配 / 最小点覆盖</strong>。</p>
+    <div class="source"><a href="https://www.xiaohongshu.com/explore/6986b8390000000028020b32?xsec_token=ABXpFwcNYYQl7lrKYHs_6GknIXAytOKGrfJolnyXawtBs=" target="_blank" rel="noopener">原文链接 ↗</a></div>
+  </div>
+
+  <div class="card google">
+    <h3>G10. 12.11 Google SDE VO 面经（BQ + 技术）</h3>
+    <div class="author">作者 / 日期：oa vo辅助 / 2025-12-11</div>
+    <p><span class="label">R1 BQ：</span></p>
+    <ul>
+      <li>Google 技术文化最吸引你的地方？</li>
+      <li>你 lead 过的一个对业务有 significant positive impact 的技术决策？</li>
+      <li>不同背景成员工作风格差异如何协调？</li>
+    </ul>
+    <p><span class="label">R2 Coding：</span></p>
+    <ul>
+      <li><strong>Easy 热身</strong>：判断二叉树是否平衡（后序递归）。</li>
+      <li><strong>Medium</strong>：最长公共子序列长度 + Follow-up 输出具体子序列（反向回溯 dp 表）。</li>
+    </ul>
+    <div class="source"><a href="https://www.xiaohongshu.com/explore/693a7435000000000d034c28?xsec_token=ABg5lBdmqZnHZ-M3xFyRBgQkk324uoabALQBxChQmuvNg=" target="_blank" rel="noopener">原文链接 ↗</a></div>
+  </div>
+
+  <div class="card google">
+    <h3>G11. Google 美国 2026 上半年面经</h3>
+    <div class="author">作者 / 日期：OooOoo / 2026-06-15</div>
+    <p><span class="label">Coding：</span></p>
+    <ul>
+      <li><strong>线上</strong>：2D points + 半径 r 的 <strong>clustering</strong> 题，本质 connected components（DFS / BFS / Union-Find）。</li>
+      <li><strong>Onsite #1（数组三连击）</strong>：
+        <ul>
+          <li>数字 n 在数组中最长连续出现长度</li>
+          <li>给目标数组 <code>[n,m,k]</code>，返回每个数字最长连续次数</li>
+          <li><strong>滑动窗口</strong>：最多改 k 个为 n，n 最长连续多少次</li>
+        </ul>
+      </li>
+      <li><strong>Onsite #2（广告轮播 / 调度）</strong>：
+        <ul>
+          <li>设计 <code>next()</code>，多广告各有展示次数，尽量轮流</li>
+          <li>加 cooldown，每个广告展示后需等冷却时间</li>
+        </ul>
+      </li>
+    </ul>
+    <p><span class="label">BQ（高度发散）：</span></p>
+    <ul>
+      <li>和工作风格差异极大的人合作</li>
+      <li>你从对方身上学到了什么</li>
+      <li>同事不努力 / WLB 差，作为 IC 怎么改善？</li>
+      <li>推动协作而不只是自己干完的方法</li>
+      <li>作为 IC 会 involve 哪些 stakeholder？</li>
+      <li>假如你是 senior director 会怎么做？</li>
+      <li>Review Photos 检测 smiling faces 怎么确保对不同用户都 works well？（metrics / FP / FN / 子人群表现差怎么办）</li>
+      <li>manager 没给步骤的项目，怎么 break down 下一步？</li>
+    </ul>
+    <div class="source"><a href="https://www.xiaohongshu.com/explore/6a3011480000000015025a0c?xsec_token=ABnUfwLvdd2OFROCXcWN9KlfS1wxshmtD0Sn-frKWuTw4=" target="_blank" rel="noopener">原文链接 ↗</a></div>
+  </div>
+
+  <div class="card google">
+    <h3>G12. Google 26NG 挂经解析（基础 / 推演踩雷点）</h3>
+    <div class="author">作者 / 日期：利维坦 / 2025-11-30</div>
+    <p><span class="label">题目：</span>贪心算法 O(n log n) 题</p>
+    <p><span class="label">挂的原因（非常值得借鉴）：</span></p>
+    <ul>
+      <li>基础概念混乱：把单调递减序列说成 Prefix Sum 原理 → 面试官判定为「背题」；</li>
+      <li>逻辑推演弱：代码里有 dead code 但靠试数才发现 → 暴露写代码时逻辑不清；</li>
+    </ul>
+    <p><span class="label">建议：</span>写完 dry run 自己走一遍；不懂别强答；NG 重点考思维与表达。</p>
+    <div class="source"><a href="https://www.xiaohongshu.com/explore/692cafba000000000d00f035?xsec_token=ABeB4hJBAW8lmJBqWpQgAYpjjeI-F7axrpr-FiLiE4o3A=" target="_blank" rel="noopener">原文链接 ↗</a></div>
+  </div>
+
+  <div class="card google">
+    <h3>G13. Google Round 1 面经</h3>
+    <div class="author">作者 / 日期：stella / 2026-01-07</div>
+    <p><span class="label">Coding：</span>m×n 数组（不同高度），找从 (0,0) → (m-1, n-1) 的路径使路径最大高度最小。</p>
+    <ul>
+      <li>解法：<strong>Dijkstra</strong>。Follow-up：能否 DFS？时间复杂度？</li>
+    </ul>
+    <p><span class="label">BQ（40 min）：</span></p>
+    <ul>
+      <li>队友抢功劳怎么办</li>
+      <li>跟难相处的人打交道</li>
+      <li>Multitask 经历</li>
+      <li>面对不合理需求</li>
+      <li>在 low culture 公司怎么办</li>
+    </ul>
+    <div class="source"><a href="https://www.xiaohongshu.com/explore/695ebb6c000000002102a31e?xsec_token=ABGrLvZ2t0vREK7mEGoR56slLnw7o0q_gyemKEylPv_So=" target="_blank" rel="noopener">原文链接 ↗</a></div>
+  </div>
+
+  <div class="card google">
+    <h3>G14. 谷歌 26NG R1（这次先 BQ 再 Coding）</h3>
+    <div class="author">作者 / 日期：昨日下雨 / 2026-04-26</div>
+    <p><span class="label">BQ：</span>常规（怎么帮助同事 / 挑战性项目 / 加入 Google 想做什么）+ 非常规（工作外消遣、爱好）</p>
+    <p><span class="label">Coding：</span><strong>合并有序数组</strong>（两个已排序数组合并到第一个，从后往前比）。Follow-up：第一个数组空间不够怎么办？→ 建新数组 / 挪位置。</p>
+    <div class="source"><a href="https://www.xiaohongshu.com/explore/69cfd001000000001a02c8b9?xsec_token=AB0NmB_3g-KTqYi2Tob-mt3Y_-4iZSLoeNeYGzEVQx5CQ=" target="_blank" rel="noopener">原文链接 ↗</a></div>
+  </div>
+
+  <!-- ============ AMAZON ============ -->
+  <h2 class="section amazon-section" id="amazon">
+    <span class="badge amazon">Amazon</span> 二、Amazon SDE 面经
+  </h2>
+
+  <div class="card amazon">
+    <h3>A1. Amazon 26 SDE Intern Timeline + 面经（Offer）</h3>
+    <div class="author">作者 / 日期：momo / 2026-04-03</div>
+    <p><span class="label">Timeline：</span>1/18 投 → 3/02 OA → 3/23 VO1 → 3/25 VO2 → 3/27 Offer</p>
+    <p><span class="label">VO1</span>（30 min BQ + 30 min Coding）：BQ 被连环追问至少 5 题，包含今年新增的 <strong>GenAI 相关问题</strong>；Coding 是常规 <strong>DFS 原题变体</strong>，面试官全程引导改 bug，最后问时空复杂度。</p>
+    <p><span class="label">VO2</span>（55 min BQ + 5 min Coding）：以 <strong>proudest project + 如何使用 GenAI</strong> 为主线，被打断追问 thesis / 项目 / 大模型八股 / AI 课程；Coding 是 hashmap easy 原题口述 + medium follow-up。</p>
+    <p><span class="label">结论：</span>组招后题型方差变大，但 BQ + communication + 有眼缘仍是关键。</p>
+    <div class="source"><a href="https://www.xiaohongshu.com/explore/69c8534c000000002903e5c0?xsec_token=ABtPtx2BR4OgIhAMTuLUsBw9p4B3S6yXFSQs314b1bJpM=" target="_blank" rel="noopener">原文链接 ↗</a></div>
+  </div>
+
+  <div class="card amazon">
+    <h3>A2. Amazon SDE 26 Summer Intern 面经</h3>
+    <div class="author">作者 / 日期：不存在bug / 2026-02-03</div>
+    <p><span class="label">Timeline：</span>12/13 OA → 1/27 VO（back-to-back 2 轮）→ 周一 Offer</p>
+    <p><span class="label">OA：</span>HackerRank 两道 medium。</p>
+    <p><span class="label">VO 格式：</span>每轮 2 BQ + follow-up + 1 Coding，难度 medium-easy。</p>
+    <p><span class="label">Round 1 Coding：</span>给数组求<strong>幂集</strong>（subsets）。</p>
+    <p><span class="label">BQ：</span>problem solving、deadline 类。</p>
+    <p><span class="label">Note：</span>今年部分组把 Coding 换成 <strong>OOD</strong>。</p>
+    <div class="source"><a href="https://www.xiaohongshu.com/explore/69821e290000000022023e5f?xsec_token=ABGB9NXIAU014L4etIQ60NfCFE78wvdEAULkhmHv65Zng=" target="_blank" rel="noopener">原文链接 ↗</a></div>
+  </div>
+
+  <div class="card amazon">
+    <h3>A3. 🇺🇸 2026 first Amazon NG SDE1 Offer</h3>
+    <div class="author">作者 / 日期：Isisisitch / 2026-01-14</div>
+    <p><span class="label">OA：</span></p>
+    <ul>
+      <li>Q1 <strong>Robotic system</strong>（近期高频）</li>
+      <li>Q2 <strong>EC2 machine type</strong></li>
+    </ul>
+    <p><span class="label">VO：</span></p>
+    <ul>
+      <li><strong>#1 BQ</strong>：get out of comfort zone、made mistake、personal project discussion</li>
+      <li><strong>#2 BQ</strong>：have conflicts with others、bad decision；Coding：<strong>K nearest neighbors</strong></li>
+      <li><strong>#3 BQ</strong>：dive deep、negative feedback；<strong>OOD（新难题）</strong>：<strong>Amazon product event router</strong>（难度较大，未提前准备很难做出）</li>
+    </ul>
+    <div class="source"><a href="https://www.xiaohongshu.com/explore/69685efd000000002200b9c8?xsec_token=ABqoSgFheu_9ztS3LI0zRcK5WsdB3kNB3PiW1gNfx2DNY=" target="_blank" rel="noopener">原文链接 ↗</a></div>
+  </div>
+
+  <div class="card amazon">
+    <h3>A4. Amazon SDE Intern (AWS) S26 面经</h3>
+    <div class="author">作者 / 日期：Jiming / 2026-02-14</div>
+    <p><span class="label">Timeline：</span>10 月 OA → 2026/1 月被捞做 FR → 02/11 back-to-back（senior dev + manager）→ 02/12 拒</p>
+    <p><span class="label">Manager 轮：</span>BQ + 简单 Coding；问 Amazon Principles 经验；<strong>GenAI 题</strong>：不是问用什么工具而是<strong>怎么 verify + risk control</strong>。</p>
+    <p><span class="label">Senior Dev 轮：</span>Coding 难度低于 LC；重点考 clarify、edge cases、先 working 再 trade-off。</p>
+    <p><span class="label">教训：</span></p>
+    <ul>
+      <li>Syntax 卡壳会扣分；</li>
+      <li>BQ 必须对齐 <strong>LP</strong>，准备 <strong>6-8 个 STAR 故事</strong>；</li>
+      <li>GenAI 相关讲清楚 verify / 测试 / 人工 review / risk 控制。</li>
+    </ul>
+    <div class="source"><a href="https://www.xiaohongshu.com/explore/698ee47b00000000150397d7?xsec_token=ABy8GRGQuaJ9N8rgajQ8qveYxAtU7_Alh7ENQrp5wF4RY=" target="_blank" rel="noopener">原文链接 ↗</a></div>
+  </div>
+
+  <div class="card amazon">
+    <h3>A5. Amazon 26 Summer SDE Intern TL（Offer）</h3>
+    <div class="author">作者 / 日期：whi s per / 2026-05-04</div>
+    <p><span class="label">Timeline：</span>开岗当天投 → 12/12 OA 邀请 → 12/19 OA pass → 3/16 VO1 → 3/17 VO2 → 3/24 Offer</p>
+    <p><span class="label">格式：</span>两轮 online VO，都是印度面试官，<strong>全部是 tag 题</strong>（去地里搜 tag 题命中率高）。</p>
+    <ul>
+      <li><strong>VO1</strong>：HM 主持，2 LC medium + 1 BQ with 3 follow-ups</li>
+      <li><strong>VO2</strong>：1 BQ with 3 follow-ups + 1 LC easy + 1 LC medium</li>
+    </ul>
+    <p><span class="label">Note：</span>portal 一直显示 "no longer under consideration" 也可能最终拿 offer，别慌。</p>
+    <div class="source"><a href="https://www.xiaohongshu.com/explore/69d5e32b000000002102d5c1?xsec_token=ABq0Fb_v_W5pQ6zjoL_qmsoYUsICfntzJUjvinuVw7UHU=" target="_blank" rel="noopener">原文链接 ↗</a></div>
+  </div>
+
+  <div class="card amazon">
+    <h3>A6. Amazon SDE Intern 过经</h3>
+    <div class="author">作者 / 日期：HiBill / 2026-06-02</div>
+    <p><span class="label">BQ：</span>tight ddl、harsh feedback、dive deep + tight deadline / conflict</p>
+    <p><span class="label">Coding：</span><strong>Compare Version Numbers</strong> 变式</p>
+    <p><span class="label">OA Tips：</span>OA 一般是 2 道 medium，90 分钟，<strong>刷他们家真题极易撞原题</strong>。</p>
+    <p><span class="label">重点：</span><strong>Work Simulation / 情景题（LP 决策模拟）</strong> 比纯 Coding 更被强调，BQ 必须 6-8 个 STAR 故事对齐 LP。</p>
+    <div class="source"><a href="https://www.xiaohongshu.com/explore/6a1e8d0300000000080024d2?xsec_token=AB2EahATxEz8ookCKHie1ElOxB6VctUX-UPqxLNMnf3XY=" target="_blank" rel="noopener">原文链接 ↗</a></div>
+  </div>
+
+  <div class="card amazon">
+    <h3>A7. Amazon SDE NG 2.5h 大 OA</h3>
+    <div class="author">作者 / 日期：心碎版椰 / 2026-04-17</div>
+    <p><span class="label">内容：</span>NG OA 升级为 2.5 小时，包含 <strong>AI Coding + Work Simulation</strong>（楼主未细说题型，仅求助）。</p>
+    <div class="source"><a href="https://www.xiaohongshu.com/explore/69e28d55000000001a02bae9?xsec_token=ABU1mY-tsQagZiAGi_LfUIPZ9dEOpJ5wUu0azvDBoQa4c=" target="_blank" rel="noopener">原文链接 ↗</a></div>
+  </div>
+
+  <div class="card amazon">
+    <h3>A8. AMZ SDE Intern Onsite Timeline</h3>
+    <div class="author">作者 / 日期：juju / 2026-03-23</div>
+    <p><span class="label">Timeline：</span>11 月中 OA → 1 月中 DB 组 Survey（没匹配上）→ 2 月中约面 → 2/27 b2b Onsite（BQ 聊嗨、LC 较简单）→ 3/3 pre-offer survey → 3/5 official offer</p>
+    <p><span class="label">组：</span>AWS SageMaker</p>
+    <div class="source"><a href="https://www.xiaohongshu.com/explore/69a9feee000000001a036acd?xsec_token=ABpUzqe0KDWpofwzbaUODJx8YqcKCJat5aQSFcR9asM-I=" target="_blank" rel="noopener">原文链接 ↗</a></div>
+  </div>
+
+  <div class="card amazon">
+    <h3>A9. Amazon SDE Intern 第一个面试就是 VO</h3>
+    <div class="author">作者 / 日期：爷又有号了 / 2026-03-26</div>
+    <p><span class="label">内容：</span>本人求助贴，没有具体题目；提醒一点：今年部分组 <strong>跳过 OA 直接发 VO</strong>。</p>
+    <div class="source"><a href="https://www.xiaohongshu.com/explore/69c5ab42000000001d01ae12?xsec_token=ABxMp3fGN1VRw2nDqWDWWIfGYKs0Xti8XrS38f-HLncG8=" target="_blank" rel="noopener">原文链接 ↗</a></div>
+  </div>
+
+  <div class="card amazon">
+    <h3>A10. Amazon SDE Intern 四次保温挂</h3>
+    <div class="author">作者 / 日期：Yvon / 2026-05-07</div>
+    <p><span class="label">Timeline：</span>11/13 投 → 3/10 OA → 3/15 提交 → 3/17 保温 → 4/6 / 4/15 / 4/22 再三保温 → 5/8 夏季招聘终止</p>
+    <p><span class="label">OA 题（比看到的都简单，核心代码模式）：</span></p>
+    <ul>
+      <li><strong>贪心</strong>：服务器配对容量最大化</li>
+      <li><strong>差分数组</strong>：对任意连续子数组 += x（正整数），使最终数组非递减，最小化所有 x 之和</li>
+    </ul>
+    <div class="source"><a href="https://www.xiaohongshu.com/explore/69c4ab3f00000000200387c1?xsec_token=AB_Ma5nyujUhnET7DVFwOkBTE-OVaoWshiet55KEEizdI=" target="_blank" rel="noopener">原文链接 ↗</a></div>
+  </div>
+
+  <div class="card amazon">
+    <h3>A11. Amazon SDE Return Offer Timeline</h3>
+    <div class="author">作者 / 日期：不明汦 / 2026-02-02</div>
+    <p><span class="label">完整时间线：</span>2024/12/13 Intern OA → 2025/1/22 Intern VO → 2025/1/30 OC → 5/27 实习开始 → 8/15 实习结束 → 2026/1/17 <strong>Full-time Return Offer</strong></p>
+    <p><span class="label">备注：</span>原组无 HC 时会进 org 大池子，建议 day 1 转组。</p>
+    <div class="source"><a href="https://www.xiaohongshu.com/explore/6980e009000000000c035358?xsec_token=ABv4rLQiReP8Z-jzYYA0SAdQ1tnUMnUhHx66uFjSGofWc=" target="_blank" rel="noopener">原文链接 ↗</a></div>
+  </div>
+
+  <div class="card amazon">
+    <h3>A12. 亚麻 SDE1 OA（求助贴）</h3>
+    <div class="author">作者 / 日期：北极限量白鲟 / 2026-02-05</div>
+    <p><span class="label">内容：</span>求助贴，无题目细节，仅证明 2026 年 2 月仍有 SDE1 社招 OA 发放。</p>
+    <div class="source"><a href="https://www.xiaohongshu.com/explore/6984eb67000000002202ecd4?xsec_token=ABmATMwDodniYT908vrE3fdbqI1g4Nx3rc9RP0e8cnmgM=" target="_blank" rel="noopener">原文链接 ↗</a></div>
+  </div>
+
+  <!-- ============ SUMMARY ============ -->
+  <h2 class="section summary-section" id="summary">三、共性观察 &amp; 通关建议</h2>
+
+  <div class="summary-card google">
+    <h3><span class="badge google">Google</span> &nbsp;Google</h3>
+    <p><span class="label">流程：</span>OA（NG 才有）→ R1（Coding + BQ，BQ 可能在前也可能在后，约 45 min）→ R2 / Onsite（2~3 轮 Coding，部分含 OOD）→ HC → Team Match → Offer。</p>
+    <p><span class="label">题型：</span>以 LeetCode Medium 包装题为主，<strong>Follow-up 决定分数</strong>；常见模式「先算法 → 再封装成类」，OOP 重要性高。</p>
+    <p><span class="label">沟通：</span>clarify、think out loud、复杂度分析、dry run；面试官多次明示「efficiency 不是关键」。</p>
+    <p><span class="label">BQ 高频清单：</span></p>
+    <ul>
+      <li>Why Google</li>
+      <li>tight deadline / too much work</li>
+      <li>a failure / made mistake</li>
+      <li>不同背景 / 工作风格的协作（WFH、跨地区）</li>
+      <li>项目优先级频繁变更</li>
+      <li>你 lead 的有业务影响的技术决策</li>
+      <li>good characteristics of a manager</li>
+      <li>initiate a project / feature</li>
+      <li>修改 initial proposal 的经历</li>
+      <li>在 low culture / 队友不努力的环境怎么改进</li>
+      <li>假如你是 senior director / 更大权力会怎么做</li>
+    </ul>
+  </div>
+
+  <div class="summary-card amazon">
+    <h3><span class="badge amazon">Amazon</span> &nbsp;Amazon</h3>
+    <p><span class="label">流程：</span>OA（HackerRank，2 题 medium，<strong>强烈建议刷真题</strong>，原题命中率高；NG 的「大 OA」2.5h 含 AI Coding + Work Simulation）→ VO 2~3 轮 back-to-back。</p>
+    <p><span class="label">每轮格式：</span>2 BQ + 3 follow-up + 1 Coding（部分组改为 OOD）。</p>
+    <p><span class="label">Coding 难度：</span>低于 LC，重点在 clarify、edge case、trade-off。常见原题：<strong>幂集 / DFS 变体 / Compare Version Number / KNN / 合并区间</strong>。</p>
+    <p><span class="label">OOD 高频：</span><strong>Product Event Router</strong>（新难题）、餐厅/系统设计类。</p>
+    <p><span class="label">BQ 必须对齐 LP（Leadership Principles），准备 6-8 个 STAR 故事：</span>tight deadline、harsh feedback、dive deep、bad decision、conflict、get out of comfort zone、proudest project、GenAI 使用 + verify + risk control（<strong>2026 新增重点</strong>）。</p>
+  </div>
+
+  <div class="summary-card common">
+    <h3>共同注意事项</h3>
+    <ul>
+      <li>别 syntax 卡壳；</li>
+      <li>写代码时多注释 + 边写边讲；</li>
+      <li>写完务必 dry run（避免 dead code、逻辑 bug）；</li>
+      <li>BQ 答案补足细节，否则会被连环追问；</li>
+      <li>不会就大白话 clarify，<strong>最忌张冠李戴的「背题感」</strong>。</li>
+    </ul>
+  </div>
+
+  <footer>
+    本文档由 BrowserCode 自动从小红书搜索结果整理。每条均带原贴 xsec_token 链接，登录后小红书账号可直接打开。建议在小红书 App 内对各原贴执行「收藏」以长期保存。
+  </footer>
+
+</div>
+</body>
+</html>

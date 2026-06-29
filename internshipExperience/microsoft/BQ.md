@@ -99,3 +99,15 @@ I can wire up that gap experiment in your repo right now — run the GT model th
 #### problems encountered
 1. for case 2 fact, when extracting instance, the instance is always a mess...
 2. 
+
+
+---
+
+for bq questions and answers, can search for the examples online
+
+
+---
+learn: https://eugeneyan.com/writing/working-with-ai/
+
+1. the fix to help with long-running tasks
+   1. for long-running tasks, verfication is crucial for autonomy, and we can have a agent with fresh context to monitor

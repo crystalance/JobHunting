@@ -177,7 +177,23 @@
 
 ---
 
-## Problems consolidated from `miscellaneous-problems.md`
+
+
+## longest consecutive increase subset
+
+1. https://leetcode.com/problems/minimum-number-of-removals-to-make-mountain-array/description/
+
+2. The interview-friendly one-sentence answer to your question is:
+
+   > A length-4 subsequence ending at 18 only proves that the LIS is at least 4. The reason the final size equals the LIS is that the array grows whenever a longer subsequence becomes possible, and if a length-5 subsequence existed anywhere in the input, the algorithm would inevitably extend `tails` to size 5 while processing its elements. Therefore the final size cannot be smaller than the true LIS, nor larger than it, so they must be equal
+   >
+   > 
+
+3. https://leetcode.com/problems/russian-doll-envelopes/
+   1. 在一段降序的连续序列中，只能选一个，作为这个LIS的其中一个元素，（因为LIS是递增的）
+4. 
+
+## State machine DP
 
 ### [121. 买卖股票的最佳时机](https://leetcode.cn/problems/best-time-to-buy-and-sell-stock/)
 
@@ -222,3 +238,5 @@
       ```
 
    2. 第二种解析其实是一种动态的变化，在遍历向前推进时，找到一个最小买入价格minprice，然后，在没有找到下一个更小的买入价格时，计算接下来每一天的利润，记录其中最大利润。如果找到下一个最小买入价格minprice，继续计算接下来未找到下一个更小买入价格时的利润最大值，直到遍历完prices数组，maxProfit就是历史最大差值！
+
+3. DP 

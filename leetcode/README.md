@@ -25,6 +25,7 @@ Decomposed from `leetcode_solution.md` by topic. Algorithms first, then data str
 - [Linked List (链表)](02-data-structure/05-linked-list.md)
 - [Trees (Binary Tree / BST / Red-Black Tree)](02-data-structure/06-trees.md)
 - [Graph (图)](02-data-structure/07-graph.md)
+- [Trie (字典树)](02-data-structure/08-trie.md)
 
 
 ## 3. Interview Prep

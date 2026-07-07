@@ -77,3 +77,50 @@
       - Each element is pushed and popped from the stack at most once, resulting in an overall complexity of O(n) instead of O(n^2).
       - The stack's monotonicity avoids unnecessary calculations by preventing repeated comparisons during iteration.
 
+2. **Pattern / template (单调栈模板)**
+
+   1. 关键决定：栈里存**下标**（方便算距离），从栈底到栈顶保持单调。想找 **next greater** 就维护一个**单调递减栈**：新元素比栈顶大时，栈顶元素就找到了它右边第一个更大的值，弹出并结算。
+
+   2. 从左到右遍历（存下标，边弹边结算）：
+
+      ```java
+      // 对每个 i，求右边第一个「更大」元素的下标 ans[i]（没有则 -1）
+      int[] nextGreater(int[] nums) {
+          int n = nums.length;
+          int[] ans = new int[n];
+          Arrays.fill(ans, -1);
+          Deque<Integer> st = new ArrayDeque<>(); // 存下标，栈内对应的值单调递减
+          for (int i = 0; i < n; i++) {
+              // 当前值比栈顶大 => 栈顶找到了它的 next greater
+              while (!st.isEmpty() && nums[i] > nums[st.peek()]) {
+                  int idx = st.pop();
+                  ans[idx] = i;          // 或 nums[i] / 距离 i - idx，视题意而定
+              }
+              st.push(i);
+          }
+          return ans; // 循环结束后仍留在栈里的，说明右边没有更大元素
+      }
+      ```
+
+   3. 从右到左遍历（另一种等价写法，栈顶即候选答案）：
+
+      ```java
+      for (int i = n - 1; i >= 0; i--) {
+          while (!st.isEmpty() && nums[st.peek()] <= nums[i]) st.pop(); // 弹掉不可能成为答案的
+          ans[i] = st.isEmpty() ? -1 : st.peek();
+          st.push(i);
+      }
+      ```
+
+   4. **改栈的单调方向 / 比较符** 即可切换语义：
+      1. next **greater** → 递减栈，弹出条件 `nums[i] > nums[st.peek()]`
+      2. next **smaller** → 递增栈，弹出条件 `nums[i] < nums[st.peek()]`
+      3. previous greater/smaller → 反过来遍历，或结算时机改在 push 之前看栈顶。
+
+3. **Worked examples**
+
+   1. [739. Daily Temperatures](https://leetcode.cn/problems/daily-temperatures/) — 直接套「从左到右 + 存下标」，`ans[idx] = i - idx`（等多少天）。
+   2. [496. Next Greater Element I](https://leetcode.cn/problems/next-greater-element-i/) — 先对 nums2 求 next greater 存进 HashMap，再查询。
+   3. [84. Largest Rectangle in Histogram](https://leetcode.cn/problems/largest-rectangle-in-histogram/) — 递增栈，弹出时以被弹出的高度为矩形高，宽 = 右边界(当前 i) − 左边界(新栈顶) − 1。常用**哨兵**（首尾各加一个 0 / 极小值）来避免边界特判。
+   4. [42. 接雨水](https://leetcode.cn/problems/trapping-rain-water/) — 递减栈，按层结算。
+

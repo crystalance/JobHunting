@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>LeetCode Practice Tracker</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --panel: #181b24;
+    --panel-2: #1f2330;
+    --border: #2a2f3d;
+    --text: #e6e8ee;
+    --muted: #8b90a0;
+    --accent: #6c8cff;
+    --accent-2: #4f6ef2;
+    --green: #3fb950;
+    --yellow: #d29922;
+    --red: #f85149;
+    --grey: #6e7681;
+    --shadow: 0 4px 20px rgba(0,0,0,.35);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+  }
+  header {
+    padding: 24px 32px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  header h1 { margin: 0; font-size: 22px; letter-spacing: .3px; }
+  header p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 24px 32px 64px; }
+  .grid { display: grid; grid-template-columns: 340px 1fr; gap: 24px; align-items: start; }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px;
+    box-shadow: var(--shadow);
+  }
+  .card h2 { margin: 0 0 14px; font-size: 15px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); }
+
+  label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 4px; }
+  input, select, textarea {
+    width: 100%;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 9px 11px;
+    font-size: 14px;
+    font-family: inherit;
+  }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
+  textarea { resize: vertical; min-height: 46px; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  button {
+    cursor: pointer;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 10px 14px;
+    transition: filter .15s ease, background .15s ease;
+  }
+  button:hover { filter: brightness(1.1); }
+  .btn-primary { background: var(--accent-2); color: #fff; width: 100%; margin-top: 16px; }
+  .btn-ghost { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); }
+  .btn-sm { padding: 5px 9px; font-size: 12px; }
+  .btn-danger { background: transparent; color: var(--red); border: 1px solid transparent; }
+  .btn-danger:hover { background: rgba(248,81,73,.12); }
+
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+  .toolbar .spacer { flex: 1; }
+  .search { max-width: 240px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; cursor: pointer; user-select: none; white-space: nowrap; }
+  th:hover { color: var(--text); }
+  tbody tr:hover { background: rgba(255,255,255,.02); }
+  td a { color: var(--accent); text-decoration: none; }
+  td a:hover { text-decoration: underline; }
+  .empty { text-align: center; color: var(--muted); padding: 32px 0; }
+
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+  .diff-Easy { background: rgba(63,185,80,.15); color: var(--green); }
+  .diff-Medium { background: rgba(210,153,34,.15); color: var(--yellow); }
+  .diff-Hard { background: rgba(248,81,73,.15); color: var(--red); }
+  .topic-pill { background: rgba(108,140,255,.13); color: var(--accent); }
+
+  /* staleness list */
+  .stale-list { list-style: none; margin: 0; padding: 0; }
+  .stale-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .stale-item:last-child { border-bottom: none; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+  .dot.fresh { background: var(--green); }
+  .dot.warn { background: var(--yellow); }
+  .dot.stale { background: var(--red); }
+  .dot.never { background: var(--grey); }
+  .stale-name { flex: 1; }
+  .stale-meta { color: var(--muted); font-size: 12px; white-space: nowrap; }
+  .stale-count { color: var(--muted); font-size: 11px; min-width: 26px; text-align: right; }
+
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 12px; font-size: 11px; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 5px; }
+
+  .stats { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 4px; }
+  .stat { }
+  .stat b { font-size: 20px; display: block; }
+  .stat small { color: var(--muted); font-size: 11px; }
+  .hint { color: var(--muted); font-size: 11px; margin-top: 8px; }
+
+  /* distribution bars */
+  .dist { display: grid; grid-template-columns: 190px 1fr 40px; gap: 8px 12px; align-items: center; font-size: 12px; }
+  .dist .dname { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dist .dbar-track { background: var(--panel-2); border-radius: 6px; height: 14px; overflow: hidden; }
+  .dist .dbar-fill { height: 100%; background: linear-gradient(90deg, var(--accent-2), var(--accent)); border-radius: 6px; }
+  .dist .dval { text-align: right; color: var(--text); }
+
+  /* matrix / heatmap */
+  .matrix-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .matrix-tools .spacer { flex: 1; }
+  .matrix-scroll { overflow-x: auto; padding-bottom: 6px; }
+  table.matrix { border-collapse: collapse; }
+  table.matrix th, table.matrix td { padding: 0; border: none; }
+  table.matrix .rowhead {
+    position: sticky; left: 0; z-index: 2; background: var(--panel);
+    text-align: left; padding: 0 10px 0 2px; font-size: 12px; color: var(--text);
+    white-space: nowrap; font-weight: 500; height: 16px;
+  }
+  table.matrix .corner { position: sticky; left: 0; z-index: 3; background: var(--panel); }
+  table.matrix .monthlabel { font-size: 10px; color: var(--muted); text-align: left; height: 16px; font-weight: 600; white-space: nowrap; }
+  table.matrix .cell {
+    width: 14px; height: 14px; border-radius: 3px;
+    outline: 1px solid rgba(255,255,255,.03); outline-offset: -1px;
+  }
+  .cell-wrap { padding: 1px !important; }
+  .lvl0 { background: #20242f; }
+  .lvl1 { background: rgba(108,140,255,.35); }
+  .lvl2 { background: rgba(108,140,255,.6); }
+  .lvl3 { background: rgba(108,140,255,.85); }
+  .lvl4 { background: #9db3ff; }
+  .today-col { outline: 1px solid var(--accent) !important; }
+  .heat-legend { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
+  .heat-legend .cell { display: inline-block; }
+
+  /* reference taxonomy */
+  .ref-open {
+    background: var(--accent-2); color: #fff; text-decoration: none;
+    padding: 7px 12px; border-radius: 8px; font-size: 13px; font-weight: 600; white-space: nowrap;
+  }
+  .ref-open:hover { filter: brightness(1.1); }
+  .taxonomy { margin: 6px 0 0; padding-left: 22px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px 24px; }
+  @media (max-width: 780px) { .taxonomy { grid-template-columns: 1fr; } }
+  .taxonomy li { padding: 4px 0; font-size: 13px; }
+  .taxonomy li b { color: var(--accent); margin-right: 8px; }
+  .taxonomy li span { color: var(--muted); font-size: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>LeetCode Practice Tracker</h1>
+  <p>Log what you solved and spot the topics you've been neglecting. Data is saved locally in this browser.</p>
+</header>
+
+<div class="wrap">
+  <div class="grid">
+    <!-- LEFT COLUMN -->
+    <div>
+      <div class="card">
+        <h2>Log a problem</h2>
+        <form id="entry-form">
+          <label for="date">Date</label>
+          <input type="date" id="date" required />
+
+          <div class="row2">
+            <div>
+              <label for="num">Problem #</label>
+              <input type="text" id="num" placeholder="704" />
+            </div>
+            <div>
+              <label for="difficulty">Difficulty</label>
+              <select id="difficulty">
+                <option>Easy</option>
+                <option selected>Medium</option>
+                <option>Hard</option>
+              </select>
+            </div>
+          </div>
+
+          <label for="title">Title</label>
+          <input type="text" id="title" placeholder="Binary Search" />
+
+          <label for="topic">Topic</label>
+          <select id="topic"></select>
+
+          <label for="link">Link (optional)</label>
+          <input type="url" id="link" placeholder="https://leetcode.com/problems/..." />
+
+          <label for="notes">Notes (optional)</label>
+          <textarea id="notes" placeholder="approach, mistakes, time complexity..."></textarea>
+
+          <button type="submit" class="btn-primary">+ Add entry</button>
+        </form>
+      </div>
+
+      <div class="card" style="margin-top:20px;">
+        <h2>Topic staleness</h2>
+        <ul class="stale-list" id="stale-list"></ul>
+        <div class="legend">
+          <span><i class="dot fresh"></i>&lt; 7d</span>
+          <span><i class="dot warn"></i>7–21d</span>
+          <span><i class="dot stale"></i>&gt; 21d</span>
+          <span><i class="dot never"></i>never</span>
+        </div>
+        <p class="hint">Sorted by longest-since-practiced first. The count on the right is how many problems you've logged for that topic.</p>
+      </div>
+    </div>
+
+    <!-- RIGHT COLUMN -->
+    <div>
+      <div class="card">
+        <div class="stats" id="stats"></div>
+      </div>
+
+      <div class="card" style="margin-top:20px;">
+        <div class="toolbar">
+          <input type="text" id="search" class="search" placeholder="Search problems / notes..." />
+          <select id="filter-topic" class="search" style="max-width:200px;"></select>
+          <span class="spacer"></span>
+          <button class="btn-ghost btn-sm" id="export-csv">Export CSV</button>
+          <button class="btn-ghost btn-sm" id="export-json">Export JSON</button>
+          <button class="btn-ghost btn-sm" id="import-btn">Import JSON</button>
+          <input type="file" id="import-file" accept="application/json" style="display:none" />
+        </div>
+        <div style="overflow-x:auto;">
+          <table>
+            <thead>
+              <tr>
+                <th data-sort="date">Date</th>
+                <th data-sort="num">#</th>
+                <th data-sort="title">Title</th>
+                <th data-sort="topic">Topic</th>
+                <th data-sort="difficulty">Diff</th>
+                <th>Notes</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FULL WIDTH: matrix + distribution -->
+  <div class="card" style="margin-top:24px;">
+    <div class="matrix-tools">
+      <h2 style="margin:0;">Practice matrix</h2>
+      <span class="spacer"></span>
+      <label style="margin:0;">Range</label>
+      <select id="matrix-range" style="width:auto;">
+        <option value="30">Last 30 days</option>
+        <option value="56" selected>Last 8 weeks</option>
+        <option value="90">Last 90 days</option>
+        <option value="180">Last 6 months</option>
+        <option value="365">Last year</option>
+      </select>
+      <span class="heat-legend">less
+        <span class="cell lvl0"></span>
+        <span class="cell lvl1"></span>
+        <span class="cell lvl2"></span>
+        <span class="cell lvl3"></span>
+        <span class="cell lvl4"></span>
+      more</span>
+    </div>
+    <div class="matrix-scroll">
+      <table class="matrix" id="matrix"></table>
+    </div>
+    <p class="hint">Rows = topics, columns = days. Darker cells mean more problems solved that day. A whole row of empty cells = a topic you've been ignoring. Hover a cell for details.</p>
+  </div>
+
+  <div class="card" style="margin-top:24px;">
+    <h2>Topic distribution</h2>
+    <div class="dist" id="dist"></div>
+  </div>
+
+  <div class="card ref-card" style="margin-top:24px;">
+    <div class="matrix-tools">
+      <h2 style="margin:0;">Reference · 灵神「如何科学刷题」题单</h2>
+      <span class="spacer"></span>
+      <a class="ref-open" href="https://leetcode.cn/discuss/post/3141566/ru-he-ke-xue-shua-ti-by-endlesscheng-q3yd/" target="_blank" rel="noopener">Open full guide ↗</a>
+    </div>
+    <p class="hint" style="margin-top:0;">A complete topic taxonomy to refer to — you don't have to follow it exactly, just use it to see what sub-topics exist and what you might be missing.</p>
+    <ol class="taxonomy">
+      <li><b>滑动窗口与双指针</b><span>定长 / 不定长 / 单序列 / 双序列 / 三指针 / 分组循环</span></li>
+      <li><b>二分算法</b><span>二分答案 / 最小化最大值 / 最大化最小值 / 第 K 小</span></li>
+      <li><b>单调栈</b><span>基础 / 矩形面积 / 贡献法 / 最小字典序</span></li>
+      <li><b>网格图</b><span>DFS / BFS / 综合应用</span></li>
+      <li><b>位运算</b><span>基础 / 性质 / 拆位 / 试填 / 恒等式 / 思维</span></li>
+      <li><b>图论算法</b><span>DFS / BFS / 拓扑排序 / 基环树 / 最短路 / 最小生成树 / 网络流</span></li>
+      <li><b>动态规划</b><span>入门 / 背包 / 划分 / 状态机 / 区间 / 状压 / 数位 / 数据结构优化 / 树形 / 博弈 / 概率期望</span></li>
+      <li><b>常用数据结构</b><span>枚举技巧 / 前缀和 / 差分 / 栈 / 队列 / 堆 / 字典树 / 并查集 / 树状数组 / 线段树</span></li>
+      <li><b>数学算法</b><span>数论 / 组合 / 概率期望 / 博弈 / 计算几何 / 随机算法</span></li>
+      <li><b>贪心与思维</b><span>基本贪心策略 / 反悔 / 区间 / 字典序 / 数学 / 思维 / 脑筋急转弯 / 构造</span></li>
+      <li><b>链表、树与回溯</b><span>前后指针 / 快慢指针 / DFS / BFS / 直径 / LCA</span></li>
+      <li><b>字符串</b><span>KMP / Z 函数 / Manacher / 字符串哈希 / AC 自动机 / 后缀数组 / 子序列自动机</span></li>
+    </ol>
+  </div>
+</div>
+
+<script>
+const TOPICS = [
+  "Sliding Window / Two Pointers",
+  "Subarrays / Prefix Sum",
+  "Binary Search",
+  "Sorting",
+  "Recursion",
+  "Backtracking",
+  "Divide and Conquer",
+  "Dynamic Programming",
+  "Greedy",
+  "Union Find",
+  "Priority Queue / Heap",
+  "Array",
+  "Stack",
+  "Hash",
+  "Linked List",
+  "Trees / BST",
+  "Graph",
+  "Math / Bit",
+  "String",
+  "Other",
+];
+
+const STORAGE_KEY = "lc-practice-tracker-v1";
+let entries = load();
+let sortKey = "date";
+let sortDir = -1; // -1 desc, 1 asc
+
+function load() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
+  catch (e) { return []; }
+}
+function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(entries)); }
+
+function todayStr() {
+  const d = new Date();
+  const off = d.getTimezoneOffset();
+  return new Date(d.getTime() - off * 60000).toISOString().slice(0, 10);
+}
+function daysBetween(a, b) {
+  return Math.floor((a - b) / 86400000);
+}
+
+// ---- populate selects ----
+function fillTopicSelects() {
+  const opts = TOPICS.map(t => `<option>${t}</option>`).join("");
+  document.getElementById("topic").innerHTML = opts;
+  document.getElementById("filter-topic").innerHTML =
+    `<option value="">All topics</option>` + opts;
+}
+
+// ---- render ----
+function render() {
+  renderStats();
+  renderStale();
+  renderTable();
+  renderMatrix();
+  renderDist();
+}
+
+function renderStats() {
+  const total = entries.length;
+  const byDiff = { Easy: 0, Medium: 0, Hard: 0 };
+  const days = new Set();
+  entries.forEach(e => { byDiff[e.difficulty] = (byDiff[e.difficulty] || 0) + 1; days.add(e.date); });
+  // current streak (consecutive days ending today or yesterday)
+  let streak = 0;
+  const daySet = days;
+  let cur = new Date(todayStr());
+  if (!daySet.has(todayStr())) cur.setDate(cur.getDate() - 1); // allow streak to count if practiced yesterday
+  while (daySet.has(cur.toISOString().slice(0,10))) { streak++; cur.setDate(cur.getDate() - 1); }
+
+  document.getElementById("stats").innerHTML = `
+    <div class="stat"><b>${total}</b><small>problems logged</small></div>
+    <div class="stat"><b>${days.size}</b><small>active days</small></div>
+    <div class="stat"><b>${streak}</b><small>day streak</small></div>
+    <div class="stat"><b style="color:var(--green)">${byDiff.Easy||0}</b><small>easy</small></div>
+    <div class="stat"><b style="color:var(--yellow)">${byDiff.Medium||0}</b><small>medium</small></div>
+    <div class="stat"><b style="color:var(--red)">${byDiff.Hard||0}</b><small>hard</small></div>
+  `;
+}
+
+function renderStale() {
+  const today = new Date(todayStr());
+  const info = TOPICS.map(t => {
+    const es = entries.filter(e => e.topic === t);
+    let last = null;
+    es.forEach(e => { const d = new Date(e.date); if (!last || d > last) last = d; });
+    const ago = last ? daysBetween(today, last) : Infinity;
+    return { topic: t, count: es.length, ago, last };
+  });
+  // only show topics you've ever practiced OR keep all? show all so gaps are visible, but push never-practiced with count 0 to a lighter treatment
+  info.sort((a, b) => b.ago - a.ago);
+
+  const cls = ago => ago === Infinity ? "never" : ago > 21 ? "stale" : ago >= 7 ? "warn" : "fresh";
+  const label = (ago, last) => {
+    if (ago === Infinity) return "never";
+    if (ago === 0) return "today";
+    if (ago === 1) return "yesterday";
+    return ago + "d ago";
+  };
+
+  document.getElementById("stale-list").innerHTML = info.map(i => `
+    <li class="stale-item">
+      <span class="dot ${cls(i.ago)}"></span>
+      <span class="stale-name">${i.topic}</span>
+      <span class="stale-meta">${label(i.ago)}</span>
+      <span class="stale-count">${i.count || ""}</span>
+    </li>
+  `).join("");
+}
+
+function renderTable() {
+  const q = document.getElementById("search").value.toLowerCase();
+  const ft = document.getElementById("filter-topic").value;
+  let rows = entries.filter(e => {
+    const matchQ = !q || [e.num, e.title, e.notes, e.topic].some(v => (v||"").toLowerCase().includes(q));
+    const matchT = !ft || e.topic === ft;
+    return matchQ && matchT;
+  });
+  rows.sort((a, b) => {
+    let va = a[sortKey] ?? "", vb = b[sortKey] ?? "";
+    if (sortKey === "num") { va = parseInt(va)||0; vb = parseInt(vb)||0; }
+    return va < vb ? -sortDir : va > vb ? sortDir : 0;
+  });
+
+  const tbody = document.getElementById("tbody");
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="7" class="empty">No entries yet. Log your first problem on the left.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = rows.map(e => `
+    <tr>
+      <td>${e.date}</td>
+      <td>${e.num ? (e.link ? `<a href="${e.link}" target="_blank" rel="noopener">${e.num}</a>` : e.num) : ""}</td>
+      <td>${e.link && !e.num ? `<a href="${e.link}" target="_blank" rel="noopener">${escapeHtml(e.title)}</a>` : escapeHtml(e.title||"")}</td>
+      <td><span class="pill topic-pill">${e.topic}</span></td>
+      <td><span class="pill diff-${e.difficulty}">${e.difficulty}</span></td>
+      <td>${escapeHtml(e.notes||"")}</td>
+      <td><button class="btn-danger btn-sm" data-del="${e.id}">✕</button></td>
+    </tr>
+  `).join("");
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function level(n) { return n <= 0 ? 0 : n === 1 ? 1 : n === 2 ? 2 : n === 3 ? 3 : 4; }
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+function renderMatrix() {
+  const days = parseInt(document.getElementById("matrix-range").value, 10);
+  const today = new Date(todayStr());
+  // build column dates oldest -> newest
+  const cols = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    cols.push(d.toISOString().slice(0, 10));
+  }
+  const todayISO = todayStr();
+
+  // counts[topic][dateISO] = n
+  const counts = {};
+  TOPICS.forEach(t => counts[t] = {});
+  entries.forEach(e => {
+    if (counts[e.topic] && cols.includes(e.date)) {
+      counts[e.topic][e.date] = (counts[e.topic][e.date] || 0) + 1;
+    }
+  });
+
+  // only show topics that have at least one entry ever, plus keep order; fallback to all if none
+  const active = TOPICS.filter(t => entries.some(e => e.topic === t));
+  const shownTopics = active.length ? active : TOPICS;
+
+  // month label row: label appears on the first column of each month
+  let monthCells = "";
+  cols.forEach((iso, idx) => {
+    const d = new Date(iso);
+    const first = idx === 0 || new Date(cols[idx-1]).getMonth() !== d.getMonth();
+    monthCells += `<td class="monthlabel">${first ? MONTHS[d.getMonth()] : ""}</td>`;
+  });
+
+  let html = `<thead><tr><th class="corner"></th>${monthCells}</tr></thead><tbody>`;
+  shownTopics.forEach(t => {
+    let cells = "";
+    cols.forEach(iso => {
+      const n = counts[t][iso] || 0;
+      const isToday = iso === todayISO ? " today-col" : "";
+      const title = `${t} — ${iso}: ${n} problem${n === 1 ? "" : "s"}`;
+      cells += `<td class="cell-wrap"><div class="cell lvl${level(n)}${isToday}" title="${escapeHtml(title)}"></div></td>`;
+    });
+    html += `<tr><td class="rowhead">${t}</td>${cells}</tr>`;
+  });
+  html += `</tbody>`;
+  document.getElementById("matrix").innerHTML = html;
+}
+
+function renderDist() {
+  const counts = {};
+  entries.forEach(e => counts[e.topic] = (counts[e.topic] || 0) + 1);
+  const arr = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  const max = arr.length ? arr[0][1] : 1;
+  const el = document.getElementById("dist");
+  if (!arr.length) { el.innerHTML = `<span class="dname" style="grid-column:1/-1">No data yet.</span>`; return; }
+  el.innerHTML = arr.map(([topic, n]) => `
+    <div class="dname" title="${escapeHtml(topic)}">${escapeHtml(topic)}</div>
+    <div class="dbar-track"><div class="dbar-fill" style="width:${Math.max(4, (n/max)*100)}%"></div></div>
+    <div class="dval">${n}</div>
+  `).join("");
+}
+
+// ---- events ----
+document.getElementById("entry-form").addEventListener("submit", e => {
+  e.preventDefault();
+  const entry = {
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    date: document.getElementById("date").value || todayStr(),
+    num: document.getElementById("num").value.trim(),
+    title: document.getElementById("title").value.trim(),
+    topic: document.getElementById("topic").value,
+    difficulty: document.getElementById("difficulty").value,
+    link: document.getElementById("link").value.trim(),
+    notes: document.getElementById("notes").value.trim(),
+  };
+  entries.push(entry);
+  save();
+  render();
+  // reset a few fields but keep date & topic for fast consecutive logging
+  document.getElementById("num").value = "";
+  document.getElementById("title").value = "";
+  document.getElementById("link").value = "";
+  document.getElementById("notes").value = "";
+  document.getElementById("num").focus();
+});
+
+document.getElementById("tbody").addEventListener("click", e => {
+  const id = e.target.getAttribute("data-del");
+  if (id) {
+    entries = entries.filter(x => x.id !== id);
+    save();
+    render();
+  }
+});
+
+document.getElementById("search").addEventListener("input", renderTable);
+document.getElementById("filter-topic").addEventListener("change", renderTable);
+document.getElementById("matrix-range").addEventListener("change", renderMatrix);
+
+document.querySelectorAll("th[data-sort]").forEach(th => {
+  th.addEventListener("click", () => {
+    const k = th.getAttribute("data-sort");
+    if (sortKey === k) sortDir *= -1; else { sortKey = k; sortDir = 1; }
+    renderTable();
+  });
+});
+
+// ---- export / import ----
+function download(filename, text, type) {
+  const blob = new Blob([text], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+document.getElementById("export-json").addEventListener("click", () => {
+  download("leetcode-practice.json", JSON.stringify(entries, null, 2), "application/json");
+});
+document.getElementById("export-csv").addEventListener("click", () => {
+  const cols = ["date","num","title","topic","difficulty","link","notes"];
+  const esc = v => `"${String(v||"").replace(/"/g,'""')}"`;
+  const csv = [cols.join(",")].concat(entries.map(e => cols.map(c => esc(e[c])).join(","))).join("\n");
+  download("leetcode-practice.csv", csv, "text/csv");
+});
+document.getElementById("import-btn").addEventListener("click", () => document.getElementById("import-file").click());
+document.getElementById("import-file").addEventListener("change", e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      if (!Array.isArray(data)) throw new Error("not an array");
+      const existing = new Set(entries.map(x => x.id));
+      data.forEach(d => { if (!d.id) d.id = Date.now().toString(36)+Math.random().toString(36).slice(2,6); if (!existing.has(d.id)) entries.push(d); });
+      save(); render();
+      alert("Imported " + data.length + " entries.");
+    } catch (err) { alert("Import failed: " + err.message); }
+  };
+  reader.readAsText(file);
+  e.target.value = "";
+});
+
+// ---- init ----
+fillTopicSelects();
+document.getElementById("date").value = todayStr();
+render();
+</script>
+</body>
+</html>

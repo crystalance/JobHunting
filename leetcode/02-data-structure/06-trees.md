@@ -548,3 +548,30 @@ class Solution:
       - **红黑树**：由于其在插入和删除操作上的高效性，红黑树更适合那些插入和删除操作频繁的应用场景，如在许多语言的标准库中实现的Map和Set等数据结构。
 
    总的来说，AVL树和红黑树各有优势，适用于不同的应用场景。选择哪一种取决于具体的需求，比如对平衡的严格程度、操作的频率和类型等因素的考虑。
+
+## tree's diameter
+
+1. Problem list
+
+   1. https://leetcode.com/problems/count-subtrees-with-max-distance-between-cities/description/
+   2. https://leetcode.com/problems/diameter-of-binary-tree/
+
+2. how do you get the diameter of a tree?
+
+   1. ```
+      BFS from any node
+          ↓
+      farthest node A
+      
+      BFS from A
+          ↓
+      farthest node B
+      
+      dist(A,B)
+      =
+      diameter
+      ```
+
+3. 利用树型DP求直径，针对图结构而言，不用记录visited数组，直接在参数里维护father节点就行
+
+   1. https://leetcode.cn/problems/difference-between-maximum-and-minimum-price-sum/solutions/2062782/by-endlesscheng-5l70/

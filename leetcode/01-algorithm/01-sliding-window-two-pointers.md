@@ -12,6 +12,57 @@
 2. so in problem ([560. Subarray Sum Equals K](https://leetcode.com/problems/subarray-sum-equals-k/)), since the element in nums can be negative, wider scope and narrow scope has no direct relation, so it can't be solved by two pointers.
 3. 
 
+#### 1.5 General two-pointer pattern (advance both, then flush the rest)
+
+1. Many two-pointer problems (comparing/merging two sequences) follow the same skeleton:
+
+   1. a **main `while`** that advances *while both pointers are still in bounds*, and
+   2. **after** that loop, one pointer may still be inbound — **you must handle the remaining elements**. Forgetting this leftover step is the #1 bug in this pattern.
+
+   ```java
+   int i = 0, j = 0;
+   while (i < n && j < m) {   // both in bounds
+       // ... compare / process a[i] and b[j], then advance i and/or j
+   }
+   // *** KEY: the main loop stops as soon as ONE pointer goes out of bounds,
+   //     so whatever is left on the OTHER side is unprocessed. Handle it here. ***
+   while (i < n) { /* deal with the remaining a[i] */ i++; }
+   while (j < m) { /* deal with the remaining b[j] */ j++; }
+   ```
+
+2. Worked example: [2337. Move Pieces to Obtain a String](https://leetcode.cn/problems/move-pieces-to-obtain-a-string/)
+
+   1. `'L'` can only slide left, `'R'` can only slide right, `'_'` is empty. Skip the `_`s and compare the pieces in order: same letter, and `'L'` needs `i >= j` (start index not left of target), `'R'` needs `i <= j`.
+
+   2. ```java
+      class Solution {
+          public boolean canChange(String start, String target) {
+              int n = start.length();
+              int i = 0, j = 0;
+              // main loop: only runs while BOTH pointers point at a real piece
+              while (i < n && j < n) {
+                  while (i < n && start.charAt(i) == '_') i++;   // skip blanks in start
+                  while (j < n && target.charAt(j) == '_') j++;  // skip blanks in target
+                  if (i == n || j == n) break;                   // one side ran out -> leave to flush below
+
+                  if (start.charAt(i) != target.charAt(j)) return false; // must be the same letter
+                  char c = start.charAt(i);
+                  if (c == 'L' && i < j) return false;  // 'L' can't move right
+                  if (c == 'R' && i > j) return false;  // 'R' can't move left
+                  i++;
+                  j++;
+              }
+              // *** don't forget the pointer that is still inbound ***
+              // any leftover on either side must be all '_' (no unmatched piece)
+              while (i < n) { if (start.charAt(i++) != '_') return false; }
+              while (j < n) { if (target.charAt(j++) != '_') return false; }
+              return true;
+          }
+      }
+      ```
+
+   3. If you drop the two trailing `while`s, cases like `start="_L"`, `target="L_"` where one side still has a real piece after the main loop would be wrongly accepted. The post-loop flush is what makes the pattern correct.
+
 #### example problems
 
 1. https://leetcode.com/problems/binary-subarrays-with-sum/description/

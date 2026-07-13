@@ -26,6 +26,7 @@ Decomposed from `leetcode_solution.md` by topic. Algorithms first, then data str
 - [Trees (Binary Tree / BST / Red-Black Tree)](02-data-structure/06-trees.md)
 - [Graph (图)](02-data-structure/07-graph.md)
 - [Trie (字典树)](02-data-structure/08-trie.md)
+- [Monotonic Queue (单调队列)](02-data-structure/09-monotonic-queue.md)
 
 
 ## 3. Interview Prep

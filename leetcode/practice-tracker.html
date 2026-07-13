@@ -81,6 +81,13 @@
   .toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
   .toolbar .spacer { flex: 1; }
   .search { max-width: 240px; }
+  .btn-ghost.active { background: rgba(210,153,34,.18); border-color: var(--yellow); color: var(--yellow); }
+
+  .check-row { display: flex; align-items: center; gap: 8px; margin-top: 16px; color: var(--text); font-size: 13px; cursor: pointer; }
+  .check-row input { width: auto; }
+
+  .star { cursor: pointer; font-size: 16px; line-height: 1; color: var(--grey); user-select: none; }
+  .star.on { color: var(--yellow); }
 
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
@@ -209,6 +216,8 @@
           <label for="notes">Notes (optional)</label>
           <textarea id="notes" placeholder="approach, mistakes, time complexity..."></textarea>
 
+          <label class="check-row"><input type="checkbox" id="review" /> Mark for review (revisit later)</label>
+
           <button type="submit" class="btn-primary">+ Add entry</button>
         </form>
       </div>
@@ -236,6 +245,7 @@
         <div class="toolbar">
           <input type="text" id="search" class="search" placeholder="Search problems / notes..." />
           <select id="filter-topic" class="search" style="max-width:200px;"></select>
+          <button class="btn-ghost btn-sm" id="filter-review" title="Show only problems marked for review">★ Review only</button>
           <span class="spacer"></span>
           <button class="btn-ghost btn-sm" id="export-csv">Export CSV</button>
           <button class="btn-ghost btn-sm" id="export-json">Export JSON</button>
@@ -246,6 +256,7 @@
           <table>
             <thead>
               <tr>
+                <th data-sort="review" title="Marked for review">★</th>
                 <th data-sort="date">Date</th>
                 <th data-sort="num">#</th>
                 <th data-sort="title">Title</th>
@@ -333,9 +344,11 @@ const TOPICS = [
   "Priority Queue / Heap",
   "Array",
   "Stack",
+  "Monotonic Queue",
   "Hash",
   "Linked List",
   "Trees / BST",
+  "Trie",
   "Graph",
   "Math / Bit",
   "String",
@@ -346,6 +359,7 @@ const STORAGE_KEY = "lc-practice-tracker-v1";
 let entries = load();
 let sortKey = "date";
 let sortDir = -1; // -1 desc, 1 asc
+let reviewOnly = false;
 
 function load() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
@@ -391,10 +405,12 @@ function renderStats() {
   if (!daySet.has(todayStr())) cur.setDate(cur.getDate() - 1); // allow streak to count if practiced yesterday
   while (daySet.has(cur.toISOString().slice(0,10))) { streak++; cur.setDate(cur.getDate() - 1); }
 
+  const reviewCount = entries.filter(e => e.review).length;
   document.getElementById("stats").innerHTML = `
     <div class="stat"><b>${total}</b><small>problems logged</small></div>
     <div class="stat"><b>${days.size}</b><small>active days</small></div>
     <div class="stat"><b>${streak}</b><small>day streak</small></div>
+    <div class="stat"><b style="color:var(--yellow)">${reviewCount}</b><small>to review</small></div>
     <div class="stat"><b style="color:var(--green)">${byDiff.Easy||0}</b><small>easy</small></div>
     <div class="stat"><b style="color:var(--yellow)">${byDiff.Medium||0}</b><small>medium</small></div>
     <div class="stat"><b style="color:var(--red)">${byDiff.Hard||0}</b><small>hard</small></div>
@@ -437,21 +453,26 @@ function renderTable() {
   let rows = entries.filter(e => {
     const matchQ = !q || [e.num, e.title, e.notes, e.topic].some(v => (v||"").toLowerCase().includes(q));
     const matchT = !ft || e.topic === ft;
-    return matchQ && matchT;
+    const matchR = !reviewOnly || e.review;
+    return matchQ && matchT && matchR;
   });
   rows.sort((a, b) => {
     let va = a[sortKey] ?? "", vb = b[sortKey] ?? "";
     if (sortKey === "num") { va = parseInt(va)||0; vb = parseInt(vb)||0; }
+    if (sortKey === "review") { va = a.review ? 1 : 0; vb = b.review ? 1 : 0; }
     return va < vb ? -sortDir : va > vb ? sortDir : 0;
   });
 
   const tbody = document.getElementById("tbody");
   if (!rows.length) {
-    tbody.innerHTML = `<tr><td colspan="7" class="empty">No entries yet. Log your first problem on the left.</td></tr>`;
+    const msg = reviewOnly ? "No problems marked for review. Star a row or check \"Mark for review\" when logging."
+                           : "No entries yet. Log your first problem on the left.";
+    tbody.innerHTML = `<tr><td colspan="8" class="empty">${msg}</td></tr>`;
     return;
   }
   tbody.innerHTML = rows.map(e => `
     <tr>
+      <td><span class="star ${e.review ? "on" : ""}" data-star="${e.id}" title="Toggle review">${e.review ? "★" : "☆"}</span></td>
       <td>${e.date}</td>
       <td>${e.num ? (e.link ? `<a href="${e.link}" target="_blank" rel="noopener">${e.num}</a>` : e.num) : ""}</td>
       <td>${e.link && !e.num ? `<a href="${e.link}" target="_blank" rel="noopener">${escapeHtml(e.title)}</a>` : escapeHtml(e.title||"")}</td>
@@ -544,6 +565,7 @@ document.getElementById("entry-form").addEventListener("submit", e => {
     difficulty: document.getElementById("difficulty").value,
     link: document.getElementById("link").value.trim(),
     notes: document.getElementById("notes").value.trim(),
+    review: document.getElementById("review").checked,
   };
   entries.push(entry);
   save();
@@ -553,21 +575,33 @@ document.getElementById("entry-form").addEventListener("submit", e => {
   document.getElementById("title").value = "";
   document.getElementById("link").value = "";
   document.getElementById("notes").value = "";
+  document.getElementById("review").checked = false;
   document.getElementById("num").focus();
 });
 
 document.getElementById("tbody").addEventListener("click", e => {
-  const id = e.target.getAttribute("data-del");
-  if (id) {
-    entries = entries.filter(x => x.id !== id);
+  const delId = e.target.getAttribute("data-del");
+  if (delId) {
+    entries = entries.filter(x => x.id !== delId);
     save();
     render();
+    return;
+  }
+  const starId = e.target.getAttribute("data-star");
+  if (starId) {
+    const ent = entries.find(x => x.id === starId);
+    if (ent) { ent.review = !ent.review; save(); render(); }
   }
 });
 
 document.getElementById("search").addEventListener("input", renderTable);
 document.getElementById("filter-topic").addEventListener("change", renderTable);
 document.getElementById("matrix-range").addEventListener("change", renderMatrix);
+document.getElementById("filter-review").addEventListener("click", e => {
+  reviewOnly = !reviewOnly;
+  e.currentTarget.classList.toggle("active", reviewOnly);
+  renderTable();
+});
 
 document.querySelectorAll("th[data-sort]").forEach(th => {
   th.addEventListener("click", () => {
@@ -589,8 +623,8 @@ document.getElementById("export-json").addEventListener("click", () => {
   download("leetcode-practice.json", JSON.stringify(entries, null, 2), "application/json");
 });
 document.getElementById("export-csv").addEventListener("click", () => {
-  const cols = ["date","num","title","topic","difficulty","link","notes"];
-  const esc = v => `"${String(v||"").replace(/"/g,'""')}"`;
+  const cols = ["date","num","title","topic","difficulty","review","link","notes"];
+  const esc = v => `"${String(v===true?"yes":v===false?"":v||"").replace(/"/g,'""')}"`;
   const csv = [cols.join(",")].concat(entries.map(e => cols.map(c => esc(e[c])).join(","))).join("\n");
   download("leetcode-practice.csv", csv, "text/csv");
 });

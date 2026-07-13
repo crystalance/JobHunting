@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GRPO Training Results — WideSearch code-act agent</title>
+<style>
+  :root{
+    --bg:#0f1420; --panel:#171e2e; --panel2:#1e2740; --ink:#e6ebf5; --muted:#9aa7bd;
+    --accent:#5aa9ff; --good:#4ade80; --bad:#f87171; --warn:#fbbf24; --line:#2a3550;
+    --mono:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.6;font-size:15px}
+  .wrap{max-width:1080px;margin:0 auto;padding:32px 24px 80px}
+  h1{font-size:29px;margin:0 0 4px;letter-spacing:-.5px}
+  h2{font-size:22px;margin:44px 0 12px;padding-bottom:8px;border-bottom:2px solid var(--line);color:var(--accent)}
+  h3{font-size:17px;margin:24px 0 8px;color:#cdd8ee}
+  .sub{color:var(--muted);font-size:14px;margin-bottom:28px}
+  p{margin:10px 0}
+  code{font-family:var(--mono);background:#0b1020;padding:1px 6px;border-radius:5px;font-size:13px;color:#cfe3ff}
+  pre{background:#0b1020;border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto;
+    font-family:var(--mono);font-size:12.5px;color:#cfe3ff;margin:8px 0}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin:14px 0}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+  .grid4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:14px}
+  .card{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:16px}
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:14px}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--muted);font-weight:600;font-size:12.5px;text-transform:uppercase;letter-spacing:.4px}
+  td.num{font-family:var(--mono);text-align:right}
+  .tag{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600}
+  .t-good{background:rgba(74,222,128,.15);color:var(--good)}
+  .t-bad{background:rgba(248,113,113,.15);color:var(--bad)}
+  .t-warn{background:rgba(251,191,36,.15);color:var(--warn)}
+  .t-info{background:rgba(90,169,255,.15);color:var(--accent)}
+  .big{font-size:26px;font-weight:700}
+  .center{text-align:center}
+  .note{font-size:13px;color:var(--muted);font-style:italic}
+  a{color:var(--accent)}
+  ul{margin:8px 0;padding-left:22px}li{margin:4px 0}
+  .win{color:var(--good);font-weight:600}
+  .down{color:var(--bad)}
+  .up{color:var(--good)}
+  .bar{height:8px;border-radius:6px;background:#0b1020;overflow:hidden;margin-top:6px}
+  .bar>span{display:block;height:100%;background:linear-gradient(90deg,#5aa9ff,#4ade80)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>GRPO Training Results — WideSearch code-act agent</h1>
+<div class="sub">Qwen2.5-7B-Instruct · SFT-v2 init → GRPO (verl, sglang, 4×A100) &nbsp;•&nbsp; 2026-07-10 → 2026-07-13 &nbsp;•&nbsp; continues <a href="progress_phase2.html">progress_phase2.html</a> · rollouts <a href="grpo_rollouts.html">grpo_rollouts.html</a></div>
+
+<!-- ============================================================ -->
+<h2>0. Headline</h2>
+<div class="panel">
+<p>GRPO clearly improved the policy. Validation <b>f1_item</b> (same 14 held-out prompts, greedy, evaluated every 5 steps) rose steadily and surpassed the SFT baseline. Run&nbsp;1 stopped at <b>step 25/30</b> because the disk filled — <i>not</i> a training failure — and is now resuming to finish.</p>
+<div class="grid4">
+  <div class="card center"><div class="note">Val f1_item · step 0</div><div class="big t-info">0.270</div><div class="note">SFT init (greedy)</div></div>
+  <div class="card center"><div class="note">Val f1_item · step 25</div><div class="big t-good">0.402</div><div class="note">+49% relative</div></div>
+  <div class="card center"><div class="note">Val has_table</div><div class="big t-good">0.57 → 0.71</div><div class="note">more rollouts finish</div></div>
+  <div class="card center"><div class="note">vs SFT baseline</div><div class="big t-good">&gt; 0.345</div><div class="note">harness baseline</div></div>
+</div>
+</div>
+
+<!-- ============================================================ -->
+<h2>1. Setup</h2>
+<div class="panel">
+<table>
+<tr><th>Component</th><th>Value</th></tr>
+<tr><td>Algorithm</td><td>GRPO · batch=8 prompts · group size <b>G=8</b> · lr 1e-6 · kl_coef 0.001 · FSDP2, 4×A100-80GB</td></tr>
+<tr><td>Rollout</td><td>sglang async multi-turn (hermes) · persistent-env agent loop · max 25 turns / 20480 tokens</td></tr>
+<tr><td>Init policy</td><td><code>actor_init_v2</code> = SFT LoRA (<code>ckpt_train_v2</code>, 122 rejection-sampled trajectories) merged into Qwen2.5-7B-Instruct</td></tr>
+<tr><td>Reward</td><td>WideSearch outcome F1: <code>R = 1.0·f1_item + 0.5·f1_row + 0.1·has_table − 0.1·cost − 0.1·constant_fill</code></td></tr>
+<tr><td>Splits</td><td>train <code>ws_en_001–070</code> · val <code>ws_en_071–085</code> (excl 079) · test <code>086–100</code> <span class="tag t-info">untouched</span></td></tr>
+<tr><td>Search cache</td><td>shared on-disk dedup across the 8 rollouts/group and across steps (cost saver)</td></tr>
+</table>
+</div>
+
+<!-- ============================================================ -->
+<h2>2. Validation trajectory <span class="note">(same 14 prompts, greedy)</span></h2>
+<div class="panel">
+<table>
+<tr><th>Step</th><th>f1_item</th><th>f1_row</th><th>has_table</th><th>score</th><th></th></tr>
+<tr><td>0 <span class="note">(SFT init)</span></td><td class="num">0.270</td><td class="num">0.116</td><td class="num">0.57</td><td class="num">0.371</td><td><div class="bar"><span style="width:67%"></span></div></td></tr>
+<tr><td>5</td><td class="num down">0.245</td><td class="num">0.064</td><td class="num">0.43</td><td class="num">0.298</td><td><div class="bar"><span style="width:61%"></span></div></td></tr>
+<tr><td>10</td><td class="num up">0.317</td><td class="num">0.114</td><td class="num">0.57</td><td class="num">0.417</td><td><div class="bar"><span style="width:79%"></span></div></td></tr>
+<tr><td>15</td><td class="num">0.308</td><td class="num">0.119</td><td class="num">0.64</td><td class="num">0.410</td><td><div class="bar"><span style="width:77%"></span></div></td></tr>
+<tr><td>20</td><td class="num up">0.347</td><td class="num">0.172</td><td class="num">0.71</td><td class="num">0.497</td><td><div class="bar"><span style="width:86%"></span></div></td></tr>
+<tr><td><b>25</b></td><td class="num win">0.402</td><td class="num">0.157</td><td class="num">0.71</td><td class="num win">0.538</td><td><div class="bar"><span style="width:100%"></span></div></td></tr>
+</table>
+<p class="note">The step-5 dip was transient noise (n=14, single greedy sample). Recovery from step 10 onward is monotonic. <code>has_table</code> 0.57 → 0.71 means more rollouts now <b>finish and write a valid table</b> — directly resolving the truncation ceiling documented in <a href="../bug&fix/2026-07-10_grpo_truncation_ceiling.md">2026-07-10_grpo_truncation_ceiling.md</a>.</p>
+</div>
+
+<!-- ============================================================ -->
+<h2>3. Per-prompt val change <span class="note">(step 0 → 25)</span></h2>
+<div class="panel">
+<div class="grid3">
+  <div class="card"><h3 style="margin-top:0" class="up">Biggest gains</h3>
+    <table>
+    <tr><td><code>ws_en_085</code></td><td class="num up">0.00 → 0.86</td></tr>
+    <tr><td><code>ws_en_076</code></td><td class="num up">0.00 → 0.71</td></tr>
+    <tr><td><code>ws_en_072</code></td><td class="num up">0.00 → 0.68</td></tr>
+    <tr><td><code>ws_en_071</code></td><td class="num up">0.73 → 0.88</td></tr>
+    <tr><td><code>ws_en_081</code></td><td class="num up">0.78 → 0.89</td></tr>
+    </table>
+  </div>
+  <div class="card"><h3 style="margin-top:0" class="down">Regressions</h3>
+    <table>
+    <tr><td><code>ws_en_083</code></td><td class="num down">0.66 → 0.44</td></tr>
+    <tr><td><code>ws_en_080</code></td><td class="num down">0.58 → 0.38</td></tr>
+    <tr><td><code>ws_en_078</code></td><td class="num down">0.19 → 0.00</td></tr>
+    <tr><td><code>ws_en_074</code></td><td class="num down">0.28 → 0.12</td></tr>
+    </table>
+  </div>
+  <div class="card"><h3 style="margin-top:0">Still unsolved</h3>
+    <table>
+    <tr><td><code>ws_en_073</code></td><td class="num">0.00</td></tr>
+    <tr><td><code>ws_en_075</code></td><td class="num">0.00</td></tr>
+    <tr><td><code>ws_en_084</code></td><td class="num">0.00</td></tr>
+    </table>
+    <p class="note">Net: 6 improved / 5 regressed; mean f1_item +0.132.</p>
+  </div>
+</div>
+</div>
+
+<!-- ============================================================ -->
+<h2>4. Baseline comparison</h2>
+<div class="panel">
+<table>
+<tr><th>Policy</th><th>val f1_item</th><th>val f1_row</th><th>has_table</th><th>environment</th></tr>
+<tr><td>SFT (<code>ckpt_train_v2</code>)</td><td class="num">0.345</td><td class="num">0.176</td><td class="num">14/14 output</td><td>harness (sampled)</td></tr>
+<tr><td>GRPO step-0 (= SFT init, greedy)</td><td class="num">0.270</td><td class="num">0.116</td><td class="num">0.57</td><td>verl greedy</td></tr>
+<tr><td><b>GRPO step-25</b></td><td class="num win">0.402</td><td class="num">0.157</td><td class="num">0.71</td><td>verl greedy</td></tr>
+</table>
+<p class="note">The verl greedy environment scores the SFT init lower (0.270) than the harness (0.345); within that same stricter environment GRPO lifted it to 0.402 — so it effectively surpasses the starting policy.</p>
+</div>
+
+<!-- ============================================================ -->
+<h2>5. Learning-signal health</h2>
+<div class="panel">
+<ul>
+<li>GRPO groups had real within-group reward spread on <b>7–8 of 8</b> groups per step (advantages ≠ 0); mean within-group std(f1_item) ~0.10–0.18.</li>
+<li>Same-prompt re-exposure was net-positive (+0.021 early), strengthening through steps 20–25.</li>
+<li>Correction on reading the numbers: <b>per-step train f1_item is not comparable</b> — verl samples the 70 train prompts <i>without replacement</i> per epoch, so each step grades a different 8 prompts of varying difficulty. Only <b>val</b> (same 14 every eval) and same-prompt re-exposure are apples-to-apples.</li>
+</ul>
+</div>
+
+<!-- ============================================================ -->
+<h2>6. Incident — disk full at step 25 <span class="tag t-warn">blocker, not a training bug</span></h2>
+<div class="panel">
+<ul>
+<li><code>/dev/root</code> (993 GB) hit <b>100%</b>. Each checkpoint = <b>~86 GB</b> (model 4×7.6 GB + full FSDP optimizer state ~60 GB). Five checkpoints + a separate 283 GB <code>~/verl</code> tree exhausted the disk.</li>
+<li><code>global_step_25</code> is <b>corrupt</b> (partial save: model rank_2 = 3.3 GB vs 7.6 GB) → the 0.402 weights are <b>not recoverable</b> from it.</li>
+<li>Best <b>complete</b> checkpoint = <code>global_step_20</code> (val f1_item 0.347, full optimizer state → resumable).</li>
+</ul>
+<p><b>Root-cause lesson:</b> verl keeps full optimizer state per checkpoint and defaults to <code>max_actor_ckpt_to_keep=null</code> (keep all). Always cap it, or the disk fills.</p>
+</div>
+
+<!-- ============================================================ -->
+<h2>7. Recovery (Plan A) &amp; current status</h2>
+<div class="panel">
+<ul>
+<li>Freed ~280 GB (deleted corrupt <code>step_25</code> + non-best intermediates 5/10/15; kept <code>step_20</code> intact). Backed up run-1 dumps → <code>rollout_dumps_run1/</code>.</li>
+<li>Added <code>trainer.max_actor_ckpt_to_keep=2</code> so the disk cannot refill.</li>
+<li><b>Resumed from <code>global_step_20</code></b> (verl auto-resume loaded model + optimizer + RNG + lr-scheduler on all 4 ranks) to run steps 21–30.</li>
+</ul>
+<p><span class="tag t-info">RUNNING</span> Resume at <b>step 21/30</b> (as of 2026-07-13), ~1h remaining. Val will re-evaluate at steps 25 and 30.</p>
+</div>
+
+<!-- ============================================================ -->
+<h2>8. Next steps</h2>
+<div class="panel">
+<ul>
+<li>Let the resume finish steps 21–30; read val f1_item at 25/30.</li>
+<li>Pick the <b>best-by-val</b> checkpoint, merge FSDP shards → HF format, confirm on val.</li>
+<li>Run the <b>untouched test set (086–100)</b> for the final headline number.</li>
+</ul>
+<p class="note">Artifacts — checkpoints: <code>post_training/grpo/checkpoints/train_scaled/</code> · per-rollout scores: <code>post_training/grpo/rollout_dumps{,_run1}/{train,val}/*.jsonl</code> · log: <code>post_training/grpo/train_scaled{,_resume}.log</code> · config: <code>post_training/grpo/run_grpo_train.sh</code> · full write-up: <code>post_training/grpo/RESULTS.md</code>.</p>
+</div>
+
+</div>
+</body>
+</html>

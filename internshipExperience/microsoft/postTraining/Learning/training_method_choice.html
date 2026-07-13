@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Training method choice — why GRPO (vs PPO, vs DPO) for our setup</title>
+<style>
+  :root { --blue:#2c5aa0; --green:#52a06a; --red:#e74c3c; --amber:#f0ad4e; --gray:#6b7280; }
+  body { font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+         margin: 28px auto; max-width: 1080px; color: #1f2328; line-height: 1.62; padding: 0 18px; }
+  h1 { margin-bottom: 2px; font-size: 28px; }
+  h2 { margin-top: 38px; border-bottom: 2px solid #e6e8eb; padding-bottom: 6px; font-size: 22px; }
+  h3 { margin-top: 24px; color: var(--blue); font-size: 17px; }
+  h4 { margin-top: 16px; margin-bottom: 4px; font-size: 14.5px; color:#333; }
+  .ts { color:#666; font-size:13px; margin-bottom: 14px; }
+  .lead { background:#f6f8fb; border:1px solid #e1e6ee; border-radius:8px; padding:14px 18px; margin:16px 0; }
+  table { border-collapse: collapse; margin: 12px 0 20px; font-size: 13.5px; width: 100%; }
+  th, td { padding: 7px 11px; border: 1px solid #dfe3e8; text-align: left; vertical-align: top; }
+  th { background: #eef2f7; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  code, pre { font-family: ui-monospace, Consolas, "Cascadia Mono", monospace; }
+  pre { background: #0f172a; color:#e2e8f0; border-radius: 8px; padding: 14px 16px; overflow-x: auto;
+        font-size: 12.5px; line-height: 1.5; }
+  code.inline { background: #eef1f4; padding: 1px 6px; border-radius: 4px; font-size: 12.8px; color:#b3005c;}
+  .ascii { white-space: pre; line-height: 1.34; font-size: 12.5px; background:#f6f8fa; color:#24292f;
+           padding:14px 16px; border:1px solid #e1e4e8; border-radius:8px; overflow-x:auto;}
+  blockquote { border-left: 4px solid #b6c2cf; margin: 12px 0; padding: 6px 16px; color:#3a3f45; background:#fafbfc; border-radius:0 6px 6px 0;}
+  blockquote.warn { border-left-color: var(--amber); background:#fff8e1; }
+  blockquote.good { border-left-color: var(--green); background:#eefaf1; }
+  blockquote.key { border-left-color: var(--blue); background:#eef3fb; }
+  .pill { display:inline-block; padding: 1px 9px; border-radius: 11px; font-size: 11px; font-weight: 700; color: #fff; }
+  .pill.blue{background:var(--blue);} .pill.green{background:var(--green);} .pill.red{background:var(--red);} .pill.gray{background:var(--gray);}
+  ul,ol{margin:8px 0 8px 4px;} li{margin:3px 0;}
+  .toc { background:#f6f8fb; border:1px solid #e1e6ee; border-radius:8px; padding:10px 20px; font-size:13.5px;}
+  .toc a{ text-decoration:none; color:var(--blue);}
+  .footnote { font-size: 12px; color: #666; margin-top: 34px; border-top:1px solid #e6e8eb; padding-top:12px;}
+  .analogy{ background:#fffdf5; border:1px dashed #e6d9a8; border-radius:8px; padding:10px 16px; margin:12px 0;}
+  .analogy b{ color:#8a6d00;}
+  .yes{color:var(--green); font-weight:700;} .no{color:var(--red); font-weight:700;}
+  hr{border:none;border-top:1px dashed #d0d7de;margin:24px 0;}
+</style>
+</head>
+<body>
+
+<h1>Training-method choice: why <span style="color:var(--green)">GRPO</span>, not PPO or DPO</h1>
+<div class="ts">Decision note for the WideSearch code-act RL project &middot; 2026-07-02</div>
+
+<div class="lead">
+<b>Decision.</b> Use <b>GRPO</b> as the main RL method. <b>PPO</b> is rejected on memory + stability grounds (it needs a second
+critic network we can't afford on 4×A100). <b>DPO</b> is rejected as the main method because it throws away our scalar reward and
+cannot explore — though it's a valid <i>cheap warm-up</i>. This note explains the reasoning from our concrete constraints.
+</div>
+
+<h3>Our situation, in four facts</h3>
+<table>
+<thead><tr><th>#</th><th>Constraint</th><th>Consequence for method choice</th></tr></thead>
+<tbody>
+<tr><td>1</td><td><b>Verifiable reward</b> — WideSearch <code>f1_by_row</code>/<code>f1_by_item</code> is a deterministic function of the output.</td><td>We have a clean scalar score for any answer. No learned reward model needed. Favours methods that <i>use the scalar</i>.</td></tr>
+<tr><td>2</td><td><b>Only 1 node × 4×A100-80GB.</b></td><td>Memory is the binding constraint. Favours methods with the <i>fewest big networks</i>.</td></tr>
+<tr><td>3</td><td><b>No labelled data</b> (no gold trajectories, no preference pairs) → RL-only per mentor.</td><td>Rules out plain SFT; also means DPO pairs would have to be manufactured.</td></tr>
+<tr><td>4</td><td><b>Long agentic code-act trajectories</b> (~10 <code>execute_python</code> cells) that we want to <i>improve</i>, not imitate.</td><td>Needs <b>exploration</b> (try new strategies) and robust credit assignment.</td></tr>
+</tbody>
+</table>
+<blockquote class="key">Read the table as a filter: (1)+(2) kill PPO's critic, (1)+(4) kill DPO's pairwise/offline nature, and all four point at
+<b>GRPO</b> — online RL, scalar reward, no critic network.</blockquote>
+
+<div class="toc"><b>Contents:</b>
+<a href="#f1">1. The three methods in one picture</a> ·
+<a href="#f2">2. GRPO vs PPO (the critic)</a> ·
+<a href="#f3">3. GRPO vs DPO</a> ·
+<a href="#f4">4. Why "no labels" doesn't favour DPO</a> ·
+<a href="#f5">5. When DPO would win</a> ·
+<a href="#f6">6. Recommendation</a>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="f1">1. The three methods in one picture</h2>
+<p>All three ultimately run the same optimizer (forward → backward → nudge weights). They differ in <b>what defines the loss</b> and
+<b>what extra machinery</b> that requires.</p>
+<div class="ascii">                 needs a 2nd            trains on            uses reward
+                 big network?          own samples?         magnitude?      exploration?
+  ┌────────┐
+  │  PPO   │      YES (critic)            YES                 YES (via critic) YES
+  ├────────┤
+  │ GRPO   │      NO  (group mean)        YES                 YES (scalar)     YES        ← our pick
+  ├────────┤
+  │  DPO   │      NO  (ref only)          NO (fixed pairs)    NO (binary)      NO
+  └────────┘</div>
+
+<!-- ============================================================ -->
+<h2 id="f2">2. GRPO vs PPO — the critic / value network</h2>
+<p>Both PPO and GRPO need an <b>advantage</b>: "was this trajectory better or worse than expected?" They differ only in how they get the
+<b>"expected"</b> baseline.</p>
+
+<h4>PPO: train a second network to guess the baseline</h4>
+<p>PPO runs <b>two</b> networks:</p>
+<ul>
+<li><b>Actor</b> = the LLM we want (the policy <code>π_θ</code>).</li>
+<li><b>Critic</b> (a.k.a. <b>value network</b>) = a <i>second</i> network, typically <b>as large as the LLM</b>, whose job is to predict the
+expected reward of a state. Advantage = <code>actual_reward − critic_prediction</code>.</li>
+</ul>
+<p>The critic is itself trained by gradient descent. That's the cost:</p>
+<pre>What actually eats GPU memory in training is NOT just weights (~16 GB for 8B).
+It's  weights + gradients + Adam optimizer states:
+
+  Actor  (8B):  ~16 GB weights + ~16 GB grads + ~64 GB optim  ┐
+  Critic (8B):  ~16 GB weights + ~16 GB grads + ~64 GB optim  ┘ ≈ TWO big models
+
+PPO ⇒ ~2× the training-memory footprint, plus the critic is hard to train
+      and unstable on long trajectories (a bad value estimate poisons every advantage).</pre>
+
+<h4>GRPO: measure the baseline empirically — no second network</h4>
+<p>GRPO deletes the critic. Instead of <i>predicting</i> expected reward, it <i>measures</i> it: sample a <b>group of G answers</b> for a
+prompt and use the group's <b>mean reward</b> as the baseline.</p>
+<pre>for prompt q:
+    sample G = 8 answers  τ₁…τ₈    from π_θ
+    score each:           r₁…r₈     (WideSearch F1 + shaping)
+    baseline  b = mean(r)           ← the "expected reward" PPO needed a whole net to guess
+    advantage Aᵢ = (rᵢ − b) / std(r)</pre>
+<blockquote class="good"><b>The memory payoff (the "halves memory vs PPO" claim):</b> dropping the critic removes an ~8B-parameter model's worth of
+<i>gradients + optimizer states</i> — the single most expensive thing in training. On our 4×A100 node, where we already juggle the policy,
+a frozen reference model (for KL), and a vLLM rollout engine, that freed memory is often the difference between fitting and OOM.</blockquote>
+<blockquote class="warn"><b>GRPO's one cost:</b> to get a reliable group mean you must sample <b>G answers per prompt</b> (e.g. 8) instead of 1 →
+more generation compute. But generation is cheap and parallel (vLLM); the critic's memory + instability is expensive and fragile. For a
+memory-limited, verifiable-reward task, trading extra rollouts for "no critic" is the right trade.</blockquote>
+
+<!-- ============================================================ -->
+<h2 id="f3">3. GRPO vs DPO</h2>
+<p><b>DPO (Direct Preference Optimization)</b> learns from <b>pairs</b>: for one prompt, a <i>chosen</i> answer and a <i>rejected</i> answer.
+Its loss is essentially a classification loss — "make chosen more likely than rejected, relative to the frozen reference." No reward model,
+no critic, and crucially <b>no generation during training</b> (it runs like SFT on a fixed dataset).</p>
+
+<table>
+<thead><tr><th></th><th>DPO</th><th>GRPO <span class="pill green">ours</span></th></tr></thead>
+<tbody>
+<tr><td>Data it needs</td><td><code>(prompt, chosen, rejected)</code> pairs</td><td><code>prompt</code> + a reward function</td></tr>
+<tr><td>Online / offline</td><td><b>Offline</b> — fixed pairs, no sampling in the loop</td><td><b>Online</b> — fresh rollouts every step</td></tr>
+<tr><td>Reward signal used</td><td><b>Binary</b>: "A beats B"</td><td><b>Scalar + spread</b>: the actual F1 magnitude</td></tr>
+<tr><td>Exploration</td><td class="no">None — only learns from existing pairs</td><td class="yes">Yes — samples new trajectories</td></tr>
+<tr><td>2nd big network</td><td>No (ref only)</td><td>No (group mean)</td></tr>
+<tr><td>Infra cost</td><td>Cheap, ~single-GPU, very stable</td><td>Needs rollout engine + reward loop</td></tr>
+<tr><td>Improves beyond dataset?</td><td class="no">No — imitation of preferred answers</td><td class="yes">Yes — discovers better strategies</td></tr>
+</tbody>
+</table>
+
+<h4>Why DPO is wrong as the <i>main</i> method for us</h4>
+<ol>
+<li><b>It throws away the magnitude of our reward.</b> Our <code>f1_by_row</code> is a rich continuous number. DPO collapses everything to
+"chosen &gt; rejected":
+<pre>F1 0.88 vs 0.29   (huge, informative gap)   ┐  become the SAME
+F1 0.51 vs 0.49   (basically a tie)         ┘  training signal under DPO</pre>
+We built a precise verifiable grader specifically to <i>have</i> that scalar — DPO discards most of it; GRPO uses it directly via the
+normalized advantage.</li>
+
+<li><b>It can't explore — it only imitates the pairs you hand it.</b> DPO never generates during training, so it can only shift preference
+toward answers <i>already in the dataset</i>. It cannot discover a better code-act search strategy that isn't in any pair. Our entire goal is
+to <i>improve</i> how the model drives the loop — that needs trying new trajectories and being rewarded, i.e. online RL.</li>
+
+<li><b>Off-policy drift.</b> DPO pairs are generated once and go stale as the policy changes; the model can't self-correct because it never
+samples. GRPO is always on-policy (fresh samples), which is more stable for long agentic trajectories.</li>
+</ol>
+
+<!-- ============================================================ -->
+<h2 id="f4">4. Why "no labelled data" does <i>not</i> tilt us toward DPO</h2>
+<p>A natural thought: "we have no labels, and DPO is label-light, so use DPO." But we have <b>no preference pairs either</b>. To manufacture
+DPO pairs we would have to:</p>
+<div class="ascii">roll out trajectories  ──▶  score each with the WideSearch grader  ──▶  pair a high-F1 vs a low-F1  ──▶  DPO</div>
+<blockquote class="key"><b>Notice the trap:</b> the moment you've built "roll out + score", you already have <i>everything GRPO needs</i>. DPO doesn't save
+you the hard part (the rollout + reward infra) — it just makes you <b>throw away the scalar afterward</b> and give up exploration. That's
+strictly less information for the same engineering cost.</blockquote>
+
+<!-- ============================================================ -->
+<h2 id="f5">5. When DPO <i>would</i> be the right call</h2>
+<ul>
+<li>You <b>can't stand up online rollout infra</b> — DPO runs like SFT (single card, very stable).</li>
+<li>Your reward is <b>inherently pairwise / subjective</b> (human "which is better?" clicks), not a clean scalar.</li>
+<li>You want a <b>cheap, stable warm-up</b> before committing to full RL.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="f6">6. Recommendation</h2>
+<blockquote class="good">
+<b>Main method: GRPO.</b> Our four constraints — verifiable scalar reward, tight GPU memory, no labels, and a task that must be
+<i>improved via exploration</i> rather than imitated — each independently point to GRPO: online RL, uses the scalar, and needs no critic
+network (unlike PPO) and no preference pairs (unlike DPO).
+</blockquote>
+<p><b>Optional pragmatic hybrid (nice de-risking for a first RL project):</b></p>
+<div class="ascii">Phase 0  build rollout + WideSearch reward infra   (needed for GRPO anyway)
+Phase A  (optional) roll out a few hundred trajectories, pair high-F1 vs low-F1,
+         run DPO as a fast, stable "get the code-act format roughly right" warm-up
+Phase B  switch to GRPO to actually optimize the scalar reward WITH exploration</div>
+<p>DPO gives an early, low-risk win while you finish hardening the rollout infra GRPO needs — but don't stop at DPO: it leaves the reward
+magnitude and all exploration on the table.</p>
+
+<div class="analogy"><b>One-line takeaway.</b> PPO = GRPO + an expensive, fragile critic we can't fit. DPO = GRPO with the scalar reward
+deleted and exploration turned off. GRPO is the sweet spot for a verifiable-reward, memory-limited, exploration-needing agent task.</div>
+
+<div class="footnote">
+Companion docs (same project):
+<a href="../rl_training_workflow.html">rl_training_workflow.html</a> (§8 RL algorithm) ·
+<a href="q3_how_rl_on_llm_works.html">q3_how_rl_on_llm_works.html</a> (how RL changes the weights) ·
+Q1 (KL term) &amp; Q2 (why SFT needs labels) in this folder.
+</div>
+
+</body>
+</html>

@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Post-Training Progress — Phase 2 (Reality Check → Rejection Sampling)</title>
+<style>
+  :root{
+    --bg:#0f1420; --panel:#171e2e; --panel2:#1e2740; --ink:#e6ebf5; --muted:#9aa7bd;
+    --accent:#5aa9ff; --good:#4ade80; --bad:#f87171; --warn:#fbbf24; --line:#2a3550;
+    --mono:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.6;font-size:15px}
+  .wrap{max-width:1080px;margin:0 auto;padding:32px 24px 80px}
+  h1{font-size:29px;margin:0 0 4px;letter-spacing:-.5px}
+  h2{font-size:22px;margin:44px 0 12px;padding-bottom:8px;border-bottom:2px solid var(--line);color:var(--accent)}
+  h3{font-size:17px;margin:24px 0 8px;color:#cdd8ee}
+  .sub{color:var(--muted);font-size:14px;margin-bottom:28px}
+  p{margin:10px 0}
+  code{font-family:var(--mono);background:#0b1020;padding:1px 6px;border-radius:5px;font-size:13px;color:#cfe3ff}
+  pre{background:#0b1020;border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto;
+    font-family:var(--mono);font-size:12.5px;color:#cfe3ff;margin:8px 0}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin:14px 0}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+  .card{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:16px}
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:14px}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--muted);font-weight:600;font-size:12.5px;text-transform:uppercase;letter-spacing:.4px}
+  .tag{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600}
+  .t-good{background:rgba(74,222,128,.15);color:var(--good)}
+  .t-bad{background:rgba(248,113,113,.15);color:var(--bad)}
+  .t-warn{background:rgba(251,191,36,.15);color:var(--warn)}
+  .t-info{background:rgba(90,169,255,.15);color:var(--accent)}
+  .big{font-size:26px;font-weight:700}
+  .center{text-align:center}
+  .note{font-size:13px;color:var(--muted);font-style:italic}
+  a{color:var(--accent)}
+  ul{margin:8px 0;padding-left:22px}li{margin:4px 0}
+  .flow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:14px 0}
+  .flow .step{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:13px}
+  .flow .arr{color:var(--muted)}
+  .win{color:var(--good);font-weight:600}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Post-Training Progress — Phase 2</h1>
+<div class="sub">Reality check on the LoRA cold-start → harness hardening → rejection-sampling data pipeline → v2 retrain &nbsp;•&nbsp; 2026-07-07 → 2026-07-09 &nbsp;•&nbsp; continues <a href="post_training_progress.html">post_training_progress.html</a></div>
+
+<!-- ============================================================ -->
+<h2>1. Reality check — the LoRA-48 cold-start is weak</h2>
+<div class="panel">
+<p>Phase 1 ended with an encouraging single-instance number (<code>ws_en_028</code>, F1_item 0.80). Running a proper <b>held-out validation set</b> (<code>ws_en_071–085</code>, 14 instances) told the real story:</p>
+<div class="grid3">
+  <div class="card center"><div class="note">Val mean F1_item</div><div class="big t-bad" style="color:var(--bad)">0.05</div><div class="note">(0.80 on 028 was an outlier)</div></div>
+  <div class="card center"><div class="note">Val mean F1_row</div><div class="big t-bad" style="color:var(--bad)">0.01</div><div class="note">score 0/14</div></div>
+  <div class="card center"><div class="note">Timed out / no output</div><div class="big t-warn" style="color:var(--warn)">~43%</div><div class="note">never converged</div></div>
+</div>
+<p><b>Why 0.80 was misleading:</b> <code>ws_en_028</code>'s gold table is <code>nan</code>-heavy, so an empty-ish table matches many cells. On real tasks the student hit three failure modes:</p>
+<table>
+<tr><th>Instance</th><th>Failure mode</th></tr>
+<tr><td><code>ws_en_071</code></td><td><b>Fabrication</b> — extraction failed (16× IndexError), then it hardcoded the <i>same</i> fake rows for every year.</td></tr>
+<tr><td><code>ws_en_072</code></td><td><b>Non-convergence</b> — searched 25 turns, wrote <b>nothing</b>.</td></tr>
+<tr><td><code>ws_en_073</code></td><td><b>Can't fill rows</b> — wrote the header only.</td></tr>
+</table>
+<p class="note"><b>Decision:</b> do NOT go to GRPO from this checkpoint — reward is near-zero on ~13/14 tasks ⇒ too sparse to learn from. Strengthen the cold-start first.</p>
+</div>
+
+<!-- ============================================================ -->
+<h2>2. Harness hardening round 2 — speed + "always have output"</h2>
+<div class="panel">
+<p>Two blockers made iteration painful: tasks took <b>15–21 min</b>, and heavy runs produced <b>no gradeable output</b>. Fixes:</p>
+<table>
+<tr><th>Problem</th><th>Fix</th><th>Result</th></tr>
+<tr><td>Search too slow (3 workers, ~28s each)</td><td><code>SEARCH_MAX_WORKERS</code> 3 → 8</td><td>~4× faster; 0 rate-limit issues</td></tr>
+<tr><td>Over-search bloats history → context 400 → no output</td><td>sliding-window <b>tool-history trim</b> (<code>_trim_tool_history</code>, 90k-char budget) + <code>safe_chat</code> overflow trim-and-retry</td><td>context never overflows</td></tr>
+<tr><td>Over-search runs forever → 900s timeout → no output</td><td><b>hard search budget</b> at the tool level (<code>SEARCH_EPISODE_BUDGET</code>): once N total searches hit → <code>SEARCH_BUDGET_EXCEEDED</code> → "write &amp; stop"</td><td class="win">timeouts essentially eliminated</td></tr>
+</table>
+<p><code>ws_en_073</code>: <b>18-min ERROR-no-output → 4m50s OK-with-output.</b> The hard budget matters because the prompt-level "~60 search" request is <i>routinely ignored</i> by a weak policy — it must be enforced in code.</p>
+</div>
+
+<!-- ============================================================ -->
+<h2>3. Prompt fixes — target the three failure modes</h2>
+<div class="panel">
+<p>Surgical edits to the base system prompt:</p>
+<ul>
+  <li><b>Anti-fabrication:</b> "if not found after a retry, write <code>nan</code> — never invent, guess, or repeat a value across rows" (a fabricated value scores worse than an honest <code>nan</code>).</li>
+  <li><b>Write early &amp; always have output:</b> create the output file in the first few turns; never finish with no file.</li>
+  <li><b>No loop:</b> if the same code fails twice, change approach.</li>
+  <li><b>Batch size 200 → 20</b> + a "~60 search budget" line (the runaway fan-out came straight from the old prompt).</li>
+</ul>
+<p><b>Val with fixed prompt:</b> F1_item <b>0.196</b> / F1_row <b>0.108</b> vs baseline 0.088 / 0.021 — <span class="win">~2× F1_item, ~5× F1_row</span>. Real but modest; confirms the data (not just the prompt) is the lever.</p>
+</div>
+
+<!-- ============================================================ -->
+<h2>4. Rejection-sampling data pipeline (ReST / RFT)</h2>
+<div class="panel">
+<p>Goal restated: SFT should teach the <b>code-act pattern + crash-free code + always a gradeable output</b> — <i>not</i> maximize F1 (that's RL's job). So we generate many teacher rollouts and keep the <b>behaviorally clean</b> ones.</p>
+<div class="flow">
+  <span class="step">gpt-5.4 × k per prompt</span><span class="arr">→</span>
+  <span class="step">verifier + deterministic gates</span><span class="arr">→</span>
+  <span class="step">LLM trajectory judge (§4f)</span><span class="arr">→</span>
+  <span class="step">retrain LoRA</span><span class="arr">→</span>
+  <span class="step">re-eval val</span>
+</div>
+
+<h3>4.1 What we built</h3>
+<ul>
+  <li><b>k-sampling</b> — <code>batch_eval --num_samples k --temperature</code> (temperature only forwarded when set, so the gpt-5.4 reasoning model isn't broken; diversity comes from its inherent stochasticity). Each rollout → <code>{iid}__t{n}</code>. <b>Validated:</b> two samples of one instance genuinely diverged (one converged, one didn't).</li>
+  <li><b>Hard search budget</b> (above) — bounds work per episode.</li>
+  <li><b>Trajectory scorer</b> — <code>post_training/sft/score_trajectories.py</code>: per rollout, F1 (WideSearch verifier) + behavioral stats (turns, searches, error-rate, loop-hash, has-output, converged, constant-fill).</li>
+</ul>
+
+<h3>4.2 Generation results so far — the budget is a big win</h3>
+<p>Teacher = gpt-5.4 (reasoning) + gpt-4.1-mini (search), base prompt, <code>SEARCH_EPISODE_BUDGET=80</code>, k=4.</p>
+<table>
+<tr><th>Batch</th><th>Rollouts</th><th>Produced output</th><th>Converged</th><th>Mean error-rate</th><th>Searches/episode</th></tr>
+<tr><td>Train 001–036</td><td>144</td><td class="win">148/148 = 100%</td><td>147/148</td><td>0.02</td><td>median 53, max 80 (cap respected)</td></tr>
+<tr><td>Train 037–070</td><td>136</td><td class="win">100%</td><td>~99%</td><td>0.01</td><td>cap respected</td></tr>
+<tr><td><b>Total (001–070 × k=4)</b></td><td><b>280</b></td><td class="win"><b>280/280 output; only 1 rollout failed</b></td><td>276/280</td><td>0.012</td><td>median 42</td></tr>
+</table>
+<p class="note">Contrast with the pre-budget student runs (~43% no output). The teacher rollouts are clean, convergent, low-error — exactly the imitation-worthy demonstrations we want to distill.</p>
+
+<h3>4.3 Selection — verifier + our own LLM judge (no third-party judge needed)</h3>
+<p>Filter is <b>hybrid</b> and mostly deterministic because we have <b>gold labels</b> (verifier-based, more reliable than LLM-as-judge):</p>
+<ul>
+  <li><b>Hard gates (code):</b> output produced, no crash/timeout, fits context, valid tool-calls.</li>
+  <li><b>Code-quality gates (code):</b> low error-rate, no loop, converged, bounded turns/searches.</li>
+  <li><b>Correctness floor (verifier):</b> a <i>low</i> F1_item bar for anti-fabrication (you can't fabricate to it) — not a high F1_row bar, which would contradict the behavioral goal.</li>
+  <li><b>LLM trajectory judge (§4f, our own):</b> an offline gpt-4.1 judge as a final top layer, scoring imitation-worthiness (clean code-act, sound reasoning, honesty, convergence). Ablatable; A/B'd before trusting.</li>
+</ul>
+<p class="note">Note: the <code>constant_fill</code> fabrication heuristic flagged 28% of the <i>strong teacher's</i> rollouts (false positives on legitimately repeated values), so it is a <b>soft signal only</b> — real fabrication detection is delegated to the LLM judge. Design: <a href="../../design/sft_data_generation_rejection_sampling.md">sft_data_generation_rejection_sampling.md</a>.</p>
+</div>
+
+<!-- ============================================================ -->
+<h2>5. Scoring, selection & the v2 retrain — the payoff</h2>
+<div class="panel">
+<h3>5.1 Scored all 280 rollouts</h3>
+<p>Behavioral quality is excellent and F1 is far above the old set:</p>
+<ul>
+  <li><b>Behavioral:</b> 280/280 have output, 276/280 converged, 0 loops, mean error-rate <b>0.012</b>.</li>
+  <li><b>F1_row</b> mean 0.41 / median 0.42 / max 1.00 &nbsp;·&nbsp; <b>F1_item</b> mean 0.71 / median 0.82 / max 1.00.</li>
+  <li><b>66/70 instances</b> have ≥1 clean, f1_item≥0.3 sample — great coverage.</li>
+</ul>
+<h3>5.2 Selected 122 trajectories (trial-aware, top-2/prompt)</h3>
+<p>Filter: clean gates (output + converged + err≤0.2 + no-loop) + f1_item≥0.3, keep top-2 per prompt (ranked correctness-then-efficiency). <b>122 kept</b> (vs the old 48) from 66 instances; 9 dropped (too long), 32 gated out. The <b>LLM judge was held as an ablation</b> — the data was already clean enough (err 0.012) that it would filter almost nothing.</p>
+<h3>5.3 v2 result on the held-out val set</h3>
+<div class="grid3">
+  <div class="card center"><div class="note">Val F1_item</div><div class="big t-good" style="color:var(--good)">0.345</div><div class="note">was 0.05 → 0.20</div></div>
+  <div class="card center"><div class="note">Val F1_row</div><div class="big t-good" style="color:var(--good)">0.176</div><div class="note">was 0.02 → 0.11</div></div>
+  <div class="card center"><div class="note">Output / timeouts</div><div class="big win">14/14</div><div class="note">0 timeouts</div></div>
+</div>
+<table>
+<tr><th>Model</th><th>F1_row</th><th>F1_item</th><th>Output</th><th>Timeouts</th></tr>
+<tr><td>Base Qwen2.5-7B</td><td>~0.00</td><td>~0.05</td><td>low</td><td>many</td></tr>
+<tr><td>LoRA-48 (old, nan-inflated)</td><td>0.021</td><td>0.088</td><td>5/8</td><td>~43%</td></tr>
+<tr><td>LoRA-48 + prompt fix</td><td>0.108</td><td>0.196</td><td>7–10/14</td><td>some</td></tr>
+<tr><td><b>LoRA-122 v2 (rejection-sampled)</b></td><td class="win"><b>0.176</b></td><td class="win"><b>0.345</b></td><td class="win"><b>14/14</b></td><td class="win"><b>0</b></td></tr>
+</table>
+<p><b>F1_row ↑ ~8×, F1_item ↑ ~4×</b> vs the original baseline; train_loss 0.389. Strong instances: <code>ws_en_072</code> 0.63/0.88, <code>ws_en_078</code> 0.48/0.51, <code>ws_en_077</code> 0.42/0.48. Only 4 hard zeros remain.</p>
+<p class="win">The SFT goal is met: correct code-act pattern, crash-free code, and <b>always a gradeable output</b> (14/14, 0 timeouts). Critically, reward is now <b>non-sparse</b> (10/14 have F1_row &gt; 0) — the sparse-reward blocker that ruled out GRPO before is gone.</p>
+</div>
+
+<!-- ============================================================ -->
+<h2>6. Current status &amp; next steps</h2>
+<div class="panel">
+<ul>
+  <li><span class="tag t-good">done</span> harness hardening (speed + always-output + hard budget), prompt fixes, k-sampling, scorer, LLM judge.</li>
+  <li><span class="tag t-good">done</span> generation of full train 001–070 (280 rollouts, 1 fail), scoring, selection (122 traj), <b>v2 LoRA retrain + val eval</b>.</li>
+  <li><span class="tag t-good">done</span> <b>v2 result: val F1_item 0.345 / F1_row 0.176, 14/14 output, 0 timeouts</b> — SFT goal achieved, GRPO cold-start ready.</li>
+  <li><span class="tag t-warn">next</span> either squeeze more SFT (LLM-judge ablation, top_n=3 ≈ 180 traj) OR proceed to <b>GRPO</b> from <code>ckpt_train_v2</code> (verl, WideSearch F1 reward + turn/search cost term).</li>
+  <li><span class="tag t-warn">final</span> report on the untouched <b>test split 086–100</b>.</li>
+</ul>
+<p class="note">Reserved splits unchanged — val <code>ws_en_071–085</code> (excl. 079), test <code>ws_en_086–100</code> (never distilled). Bug/fix log: <a href="../bug&fix/2026-07-07_silent_harness_crash.md">bug&fix/2026-07-07_silent_harness_crash.md</a>.</p>
+</div>
+
+</div>
+</body>
+</html>

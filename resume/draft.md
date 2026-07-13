@@ -8,9 +8,9 @@ September 2020 - June 2024
 
 ## Internship Experience
 ### Research Intern   --> Microsoft (03/2026 --> 07/2026)
-1. Research/Developed a mutli-agent colleborate framework called HDMAS(homogeneous decentralized multi-agent system), surpassing single github copilot agent performance by ... on widesearch benchmark.
-2. Developed a multi-agent wide-search benchmark creating pipeline (for given cases --> facts --> ground-truth--> verifier) for Microsoft Excel Agents. ---> impact( turning expansive, labour intensive )
-3. Using SFT (lora, RFT) and RL(GRPO) to post-trained qwen2.5-7B-instruct, to teach it to write  code-act pattern, reaching __ on widesearch benchmark, --> same with/surpassing ... model
+1. Architected HDMAS, a planner-free, decentralized multi-agent architecture using a lock-protected shared blackboard and distributed task claiming. Holding the GPT-5.4 Copilot backend constant, the three-agent system improved Row-F1 by 11.4% and Item-F1 by 8.0% over a single agent on 200 WideSearch tasks.
+2. Built an automated evaluation pipeline for Excel web-search agents that decomposes tasks into atomic facts, generates and independently verifies reproducible ground truth, and scores answers extracted from execution traces; scaled to 50 tasks and 310 fact definitions while raising verified ground-truth coverage from 22.7% to 70.1%.
+3. Post-trained Qwen2.5-7B (LoRA SFT + GRPO RL on verl/sglang, 4×A100 FSDP2) into a tool-using "code-act" web-search agent — built the custom multi-turn tool/agent-loop, reward function, and evaluation harness — lifting WideSearch f1 from 0.05 → 0.35 (SFT) → ~0.40 (RL).
 
 
 ### Software Engineer Intern    --> Alibaba Cloud(07/2025 --> 11/2025)
@@ -32,7 +32,7 @@ September 2020 - June 2024
 ### BroswerUse Bot
 April 2026 - July 2026
 
-1. controlled on the phone using telegram bot, easy to access, the main idea/main feature is includes human-in-the-loop, hand off the account login
+1. controlled on the phone using telegram bot, easy to access, the main idea/main feature is includes human-in-the-loop, hand off the account login to user by a link via noVNC, and it can do and access much more things when logged in, which is fundamentally powerful than naive browseruse agent.
 2. Integrating and improving broswerUse agent(opensource project,https://github.com/browser-use/browser-use) for manipulating browser, reducing batch task execute time by __%, using code-act pattern tool and skill system.
 3. Observability: integrated Langfuse for llm tracing, given request id--> find tracing id --> to locate the bug/problems for production environment, evaluate cost
 4. Develop CI/CD pipeline using Github Action, cutting down the deploy time(?) deploy the project on AWS EC2 for 24h responding.

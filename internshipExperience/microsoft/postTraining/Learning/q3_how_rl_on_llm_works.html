@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Q3 — How post-training / RL / RL-on-LLM actually changes the weights</title>
+<style>
+  :root { --blue:#2c5aa0; --green:#52a06a; --red:#e74c3c; --amber:#f0ad4e; --gray:#6b7280; }
+  body { font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+         margin: 28px auto; max-width: 1080px; color: #1f2328; line-height: 1.62; padding: 0 18px; }
+  h1 { margin-bottom: 2px; font-size: 28px; }
+  h2 { margin-top: 38px; border-bottom: 2px solid #e6e8eb; padding-bottom: 6px; font-size: 22px; }
+  h3 { margin-top: 24px; color: var(--blue); font-size: 17px; }
+  h4 { margin-top: 16px; margin-bottom: 4px; font-size: 14.5px; color:#333; }
+  .ts { color:#666; font-size:13px; margin-bottom: 14px; }
+  .lead { background:#f6f8fb; border:1px solid #e1e6ee; border-radius:8px; padding:14px 18px; margin:16px 0; }
+  table { border-collapse: collapse; margin: 12px 0 20px; font-size: 13.5px; width: 100%; }
+  th, td { padding: 7px 11px; border: 1px solid #dfe3e8; text-align: left; vertical-align: top; }
+  th { background: #eef2f7; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  code, pre { font-family: ui-monospace, Consolas, "Cascadia Mono", monospace; }
+  pre { background: #0f172a; color:#e2e8f0; border-radius: 8px; padding: 14px 16px; overflow-x: auto;
+        font-size: 12.5px; line-height: 1.5; }
+  code.inline { background: #eef1f4; padding: 1px 6px; border-radius: 4px; font-size: 12.8px; color:#b3005c;}
+  .ascii { white-space: pre; line-height: 1.34; font-size: 12.5px; background:#f6f8fa; color:#24292f;
+           padding:14px 16px; border:1px solid #e1e4e8; border-radius:8px; overflow-x:auto;}
+  blockquote { border-left: 4px solid #b6c2cf; margin: 12px 0; padding: 6px 16px; color:#3a3f45; background:#fafbfc; border-radius:0 6px 6px 0;}
+  blockquote.warn { border-left-color: var(--amber); background:#fff8e1; }
+  blockquote.good { border-left-color: var(--green); background:#eefaf1; }
+  blockquote.key { border-left-color: var(--blue); background:#eef3fb; }
+  .pill { display:inline-block; padding: 1px 9px; border-radius: 11px; font-size: 11px; font-weight: 700; color: #fff; }
+  .pill.blue{background:var(--blue);} .pill.green{background:var(--green);} .pill.red{background:var(--red);}
+  ul,ol{margin:8px 0 8px 4px;} li{margin:3px 0;}
+  .toc { background:#f6f8fb; border:1px solid #e1e6ee; border-radius:8px; padding:10px 20px; font-size:13.5px;}
+  .toc a{ text-decoration:none; color:var(--blue);}
+  .footnote { font-size: 12px; color: #666; margin-top: 34px; border-top:1px solid #e6e8eb; padding-top:12px;}
+  .analogy{ background:#fffdf5; border:1px dashed #e6d9a8; border-radius:8px; padding:10px 16px; margin:12px 0;}
+  .analogy b{ color:#8a6d00;}
+  hr{border:none;border-top:1px dashed #d0d7de;margin:24px 0;}
+</style>
+</head>
+<body>
+
+<h1>How post-training works — and what it <i>actually does to the weights</i></h1>
+<div class="ts">Answer to Q3 &middot; written for someone new to training &middot; 2026-07-01</div>
+
+<div class="lead">
+Your real question is the last one: <b>"I don't have a concrete sense of how this changes every parameter in an LLM."</b>
+So this doc is built bottom-up: first the one mechanism that <i>all</i> training shares (it's always the same three lines), then how
+pre-training, SFT, and RL are just <b>different ways of choosing the loss</b> that feeds those three lines, and finally a worked example of a
+<i>single weight</i> moving during RL.
+</div>
+
+<div class="toc">
+<b>Contents:</b>
+<a href="#s1">1. The only update rule there is</a> ·
+<a href="#s2">2. What "a parameter" means</a> ·
+<a href="#s3">3. Pre-train vs SFT vs RL = choice of loss</a> ·
+<a href="#s4">4. How SFT changes weights</a> ·
+<a href="#s5">5. How RL works (general)</a> ·
+<a href="#s6">6. How RL-on-LLM works</a> ·
+<a href="#s7">7. One weight, one RL step (worked)</a> ·
+<a href="#s8">8. GRPO end-to-end</a> ·
+<a href="#s9">9. Mental model &amp; misconceptions</a>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="s1">1. There is only ONE update rule — everything else is bookkeeping</h2>
+<p>No matter what you call it — pre-training, SFT, DPO, PPO, GRPO — the model's ~8 billion numbers are changed by the <b>exact same three
+steps</b>, repeated millions of times:</p>
+<pre>1. FORWARD :  loss = L(model(input), target)      # run the model, score how "wrong" it was
+2. BACKWARD:  grad = dLoss/dθ                      # for EVERY weight θ, how does loss change if θ nudges up?
+3. UPDATE  :  θ  ←  θ  −  lr · grad                # nudge each weight the tiny bit that lowers loss</pre>
+<p>That is <b>gradient descent</b>. Step 2 (backpropagation) produces one gradient number <i>per weight</i> — 8 billion gradients for an 8B
+model. Step 3 nudges all 8 billion at once, each by <code>lr × its own gradient</code> (<code>lr</code> = learning rate, a tiny number like
+<code>1e-6</code>).</p>
+<blockquote class="key"><b>The single most important idea:</b> "training" never sets weights to hand-chosen values. It only ever
+<b>nudges every weight a hair in the direction that reduces the loss</b>, then re-measures, and nudges again. The <i>only</i> thing that differs
+between SFT and RL is <b>how the loss is computed</b> — i.e. what "wrong" means.</p>
+
+<div class="analogy"><b>Analogy.</b> Imagine 8 billion volume knobs on a giant mixing board. Backprop is a meter next to each knob saying
+"turn me left a smidge / right a smidge to make the song sound better." The update turns every knob by that smidge. You never know the
+"right" setting of any single knob — you just keep making tiny improvements. SFT and RL only disagree about what "sounds better" means.</div>
+
+<!-- ============================================================ -->
+<h2 id="s2">2. What "a parameter" even is</h2>
+<p>An LLM is stacks of matrices (attention &amp; MLP weight matrices) plus embeddings. A <b>parameter</b> = one number inside one of those
+matrices. "Qwen3-8B" means ≈ 8 billion such numbers. At inference they're frozen; at training they're the variables we optimize.</p>
+<p>The model's output for the next token is a <b>probability distribution over the vocabulary</b> (~150k tokens). Every weight influences that
+distribution a little. Training = reshaping those distributions by moving weights.</p>
+<div class="ascii">tokens ──▶ [embed] ──▶ [attn+MLP] ×N layers ──▶ [unembed] ──▶ logits ──softmax──▶ P(next token)
+                          ▲                                   
+                    all the θ live here                       
+                    (the 8B numbers we train)                 </div>
+
+<!-- ============================================================ -->
+<h2 id="s3">3. Pre-training vs SFT vs RL = three ways to define the loss</h2>
+<table>
+<thead><tr><th>Stage</th><th>Data it needs</th><th>What "wrong" (loss) means</th><th>Effect</th></tr></thead>
+<tbody>
+<tr><td><b>Pre-training</b></td><td>Raw internet text (no labels)</td><td>"You failed to predict the next token in this document."</td><td>Learns language, facts, code syntax. Trillions of tokens.</td></tr>
+<tr><td><b>SFT</b> (supervised fine-tune)</td><td><b>Labelled</b> (prompt → ideal answer) pairs</td><td>"You failed to reproduce the human-written ideal answer token-for-token."</td><td>Teaches <i>format</i> and task behaviour by imitation.</td></tr>
+<tr><td><b>RL</b> (RLHF/GRPO…)</td><td>Prompts + a <b>reward</b> function or model (no ideal answer needed)</td><td>"Your <i>own</i> answer scored low; make high-scoring answers more likely."</td><td>Teaches by <i>trial and reward</i>, not imitation.</td></tr>
+</tbody>
+</table>
+<blockquote class="key"><b>"Post-training" = everything after pre-training</b> — usually SFT then RL. Same optimizer, same three steps from §1. Only the loss
+differs.</blockquote>
+<p><b>This is exactly why your mentor's constraint matters:</b> SFT's loss literally requires an "ideal answer" to copy. You don't have those
+(no labelled trajectories). RL's loss does <i>not</i> need an ideal answer — only a way to <i>score</i> whatever the model produced. WideSearch
+gives you that score for free (<code>f1_by_row</code>). So RL is available to you and SFT is not.</p>
+
+<!-- ============================================================ -->
+<h2 id="s4">4. How SFT changes weights (the easy case first)</h2>
+<p>SFT is "predict the next token, but the document is a human demonstration." For each token position the loss is
+<b>cross-entropy</b>: <code>−log P(correct_next_token)</code>.</p>
+<pre>target answer:  "The  capital  is  Paris ."
+at position 4 the model outputs P(·):  Paris 0.10 , London 0.20 , Rome 0.05 , ...
+loss_4 = −log P("Paris") = −log(0.10) = 2.30      # high loss: "Paris" wasn't likely enough
+backward: which weights, if nudged, would have RAISED P("Paris")?  →  gradients
+update:   nudge exactly those weights so next time P("Paris") is a bit higher (say 0.12)</pre>
+<p>Do this over millions of demonstration tokens and the weights settle where the model reliably reproduces the demonstrated style. <b>SFT =
+imitation.</b> The signal is dense (every token gives a gradient) and cheap — which is why it's stable and fast. Its limit: the model can only
+copy what's in the labels; it can't discover a <i>better</i> answer than the human wrote.</p>
+
+<!-- ============================================================ -->
+<h2 id="s5">5. How RL works (general, before LLMs)</h2>
+<p>RL is learning from <b>consequences</b> instead of demonstrations. The loop:</p>
+<div class="ascii">   ┌─────────────────────────────────────────────┐
+   │  agent takes ACTION  ──▶  environment         │
+   │        ▲                      │               │
+   │        │                 REWARD (a number)    │
+   │        └──── learn: make high-reward ─────────┘
+   │             actions more likely               </div>
+<p>Key vocabulary, mapped to plain terms:</p>
+<table>
+<thead><tr><th>RL term</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td><b>Policy</b> <code>π</code></td><td>The decision-maker. <b>= the LLM.</b> Its weights <code>θ</code> are what we train.</td></tr>
+<tr><td><b>Action</b></td><td>Something the policy emits. For an LLM, <b>each generated token is an action</b> (and a whole answer is a sequence of actions).</td></tr>
+<tr><td><b>Reward</b> <code>r</code></td><td>A score for the outcome. For you: WideSearch F1. High = good.</td></tr>
+<tr><td><b>Trajectory</b> <code>τ</code></td><td>One full episode = one complete answer (all its tokens/steps).</td></tr>
+<tr><td><b>Advantage</b> <code>A</code></td><td>How much <i>better than average</i> this trajectory was. The actual training signal (see §7).</td></tr>
+</tbody>
+</table>
+<p>The core RL idea (the "policy gradient") is one sentence:</p>
+<blockquote class="key"><b>Increase the probability of actions that led to above-average reward; decrease the probability of actions that led to
+below-average reward.</b></blockquote>
+
+<!-- ============================================================ -->
+<h2 id="s6">6. How RL-on-LLM works</h2>
+<p>Now specialize the loop to a language model. The "action" is generating tokens; the "reward" comes after the whole answer is scored.</p>
+<div class="ascii">   prompt ─▶ LLM(π_θ) generates a full answer  τ = (t₁, t₂, …, t_k)      ← the ACTIONS
+                              │
+                              ▼
+                    reward function r(τ)           ← e.g. WideSearch F1 = 0.72
+                              │
+                              ▼
+          "0.72 is above the group's average (0.55) → advantage +"
+                              │
+                              ▼
+   nudge θ so THIS answer's tokens become MORE likely next time
+   (and below-average answers' tokens become LESS likely)</div>
+
+<h3>The RL loss for an LLM</h3>
+<p>Where SFT's loss was <code>−log P(human_token)</code>, RL's loss (policy gradient) is:</p>
+<pre>loss  =  − Advantage · log P_θ(the tokens the model itself generated)</pre>
+<p>Read it carefully — the difference from SFT is <b>two changes</b>:</p>
+<ol>
+<li>The tokens are the model's <b>own samples</b>, not human labels. (That's why no labelled data is needed.)</li>
+<li>Each is weighted by <b>Advantage</b>. If advantage is <span class="pill green">+</span>, minimizing this loss <i>raises</i>
+<code>log P</code> of those tokens (do more of that). If advantage is <span class="pill red">−</span>, it <i>lowers</i> them (do less of that).</li>
+</ol>
+<blockquote class="good"><b>That's the whole trick.</b> RL-on-LLM reuses the <i>identical</i> cross-entropy machinery as SFT, but (a) trains on the
+model's own generations and (b) multiplies each token's gradient by a reward-derived advantage. Positive advantage ≈ "treat this as a good
+demonstration to imitate"; negative advantage ≈ "treat this as an anti-demonstration."</blockquote>
+
+<!-- ============================================================ -->
+<h2 id="s7">7. Watching ONE weight move during one RL step</h2>
+<p>Let's make it painfully concrete. Say weight <code>θ = 0.4130</code> lives in an MLP matrix. One RL step:</p>
+<pre>Step A — generate:  policy samples an answer τ.  Its tokens include "Paris".
+Step B — score:     reward r(τ) = 0.72.
+Step C — baseline:  we also sampled 7 other answers; their mean reward = 0.55.
+Step D — advantage: A = (0.72 − 0.55) = +0.17   (this answer was better than typical)
+Step E — backward:  for weight θ, backprop asks:
+                    "if θ goes up a hair, does log P(the tokens in τ) go up or down?"
+                    answer (the gradient piece): ∂logP/∂θ = +0.6
+Step F — combine:   RL gradient for θ  =  −A · ∂logP/∂θ  =  −(+0.17)(+0.6) = −0.102
+Step G — update:    θ ← θ − lr · grad  =  0.4130 − (1e-6)(−0.102) = 0.41300010…
+                                          ▲ tiny nudge UP, because this token helped a good answer</pre>
+<p>Multiply that by 8 billion weights (each gets its own <code>∂logP/∂θ</code>), and by thousands of steps. <b>No single weight is ever
+"set."</b> Each just drifts by ~<code>1e-7</code>-scale nudges, step after step, and the <i>aggregate</i> of billions of such nudges is a model
+that produces higher-reward answers. If the answer had been <i>bad</i> (advantage negative), the sign of the nudge flips and that token's
+weights are pushed down instead.</p>
+<blockquote class="warn"><b>Why RL is noisier/harder than SFT.</b> SFT gets a gradient at <i>every</i> token from a known-good target — dense, low
+variance. RL gets <i>one</i> reward for a whole long answer, then smears it across all tokens via the advantage — sparse, high variance
+("credit assignment": which of the 300 tokens actually deserved the 0.72?). That's why RL needs tricks: a good baseline (§8), a KL leash, many
+samples per prompt, tiny learning rate.</blockquote>
+
+<!-- ============================================================ -->
+<h2 id="s8">8. Putting it together: GRPO (your algorithm)</h2>
+<p>GRPO is just a smart way to compute the <b>Advantage</b> in §6–7 without training a second "value" network. For each prompt it samples a
+<b>group</b> of answers and uses the group's own average as the baseline:</p>
+<pre>for each prompt q:
+    sample G = 8 answers  τ₁…τ₈  from the current policy
+    score each:           r₁…r₈           (WideSearch F1 + shaping)
+    baseline:             b = mean(r)     ← "typical" reward for this prompt
+    advantage of each:    Aᵢ = (rᵢ − b) / std(r)     ← above/below average, normalized
+    loss = − Σᵢ  Aᵢ · logP_θ(τᵢ)   +   β · KL(π_θ ‖ π_ref)
+                                         └─ the leash from Q1: don't drift too far
+    backward + update θ    (the same three steps from §1)</pre>
+<ul>
+<li><b>Why a group?</b> The mean gives a free, unbiased "how good is average here?" line. Answers above it get pushed up, below it pushed
+down — automatically, per prompt, no critic network (saves half the GPU memory).</li>
+<li><b>Why normalize by std?</b> Keeps gradient scale sane whether a prompt's rewards are all near 0.9 or all near 0.1.</li>
+<li><b>The KL term</b> (your Q1) keeps <code>π_θ</code> near the frozen instruct model so it doesn't collapse — critical because, with no
+SFT, that reference is your only format anchor.</li>
+</ul>
+
+<!-- ============================================================ -->
+<h2 id="s9">9. Mental model &amp; common misconceptions</h2>
+<div class="analogy"><b>One-line summary.</b> Post-training = repeat {run the model, score it, nudge all 8B weights a hair toward higher score}.
+SFT scores by "did you copy the human answer?"; RL scores by "how good was your <i>own</i> answer?". The mechanics of the nudge are identical.</div>
+<table>
+<thead><tr><th>Misconception</th><th>Reality</th></tr></thead>
+<tbody>
+<tr><td>"RL edits specific weights for specific facts."</td><td>No. Every step nudges <i>all</i> weights by a tiny amount; behaviour is the emergent sum of billions of nudges. No weight = one fact.</td></tr>
+<tr><td>"RL needs the right answer."</td><td>It needs a way to <i>score</i> an answer, not the answer itself. That's the whole reason it fits your no-labels situation.</td></tr>
+<tr><td>"RL is a different training engine than SFT."</td><td>Same optimizer, same backprop. RL just weights the token gradients by advantage and trains on self-generated text.</td></tr>
+<tr><td>"Bigger learning rate = faster learning."</td><td>In RL, too-big LR → collapse. RL LR (~1e-6) is ~100× smaller than SFT because the signal is noisy.</td></tr>
+<tr><td>"One reward updates one action."</td><td>One trajectory reward is spread across <i>all</i> its tokens (credit assignment) — the hard part of RL.</td></tr>
+</tbody>
+</table>
+
+<h3>How the three connect for your project</h3>
+<div class="ascii">  Qwen3-8B  (pre-trained: knows language + code)
+      │
+      │  [you SKIP SFT — no labelled trajectories]
+      ▼
+  RL / GRPO  (score each self-generated WideSearch answer by F1, nudge weights up/down)
+      │
+      ▼
+  a policy that drives the code-act loop better — learned purely from reward</div>
+
+<div class="footnote">
+Companion: <a href="../rl_training_workflow.html">rl_training_workflow.html</a> (the full end-to-end plan) ·
+Q1 (KL) and Q2 (why SFT needs labels) in this same folder expand on two pieces referenced above.
+</div>
+
+</body>
+</html>

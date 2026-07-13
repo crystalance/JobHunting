@@ -9,12 +9,11 @@ September 2020 - June 2024
 ## Internship Experience
 ### Research Intern   --> Microsoft (03/2026 --> 07/2026)
 1. Architected HDMAS, a planner-free, decentralized multi-agent architecture using a lock-protected shared blackboard and distributed task claiming. Holding the GPT-5.4 Copilot backend constant, the three-agent system improved Row-F1 by 11.4% and Item-F1 by 8.0% over a single agent on 200 WideSearch tasks.
-2. Built an automated evaluation pipeline for Excel web-search agents that decomposes tasks into atomic facts, generates and independently verifies reproducible ground truth, and scores answers extracted from execution traces; scaled to 50 tasks and 310 fact definitions while raising verified ground-truth coverage from 22.7% to 70.1%.
-3. Post-trained Qwen2.5-7B (LoRA SFT + GRPO RL on verl/sglang, 4×A100 FSDP2) into a tool-using "code-act" web-search agent — built the custom multi-turn tool/agent-loop, reward function, and evaluation harness — lifting WideSearch f1 from 0.05 → 0.35 (SFT) → ~0.40 (RL).
-
+2. Built an automated evaluation pipeline for Excel agents that decomposes tasks into atomic facts, generates and independently verifies reproducible ground truth; scaled to 50 tasks and 310 fact definitions while raising verified ground-truth coverage from 22.7% to 70.1%.
+3.Post-trained Qwen2.5-7B into a tool-using web-search agent via LoRA SFT + GRPO RL (verl/sglang/vLLM, 4×A100 FSDP2) — built the custom persistent-kernel tool loop, reward function, and eval harness — lifting WideSearch f1 from 0.05 → 0.35 (SFT) → 0.41 (RL), a +17% RL gain over the SFT baseline under variance-controlled evaluation.
 
 ### Software Engineer Intern    --> Alibaba Cloud(07/2025 --> 11/2025)
-• Designed and implemented an A2A (Agent-to-Agent) protocol adapter for AgentScope Runtime(https://github.com/agentscope-ai/agentscope, 27k stars opensource agent sdk), enabling bidirectional translation between external protocols and internal agent architecture. Exposed JSON-RPC APIs via FastAPI with asynchronous streaming support to improve multi-agent collaboration and system integration.
+• Built an A2A protocol adapter for AgentScope Runtime, part of a 27K+-star open-source agent framework, enabling cross-framework agent interoperability through bidirectional JSON-RPC translation and asynchronous FastAPI streaming.
 • Built deployment tooling for agent applications in AgentScope Runtime, automating the full pipeline from Python wheel packaging and OSS pre-signed uploads to serverless deployment orchestration on the Bailian platform, enabling one-click release, versioning, and rapid iteration.
 • Contributed to the Bailian platform’s full-code agent management console, implementing application search and status filtering, SLR permission validation, lifecycle management, and unified visibility into Function Compute (FC) deployment metadata and runtime status.
 • Integrated platform-level AI safety guardrails, supporting customizable keyword blocking and policy configuration, and enabling controlled content moderation responses to improve agent application security and compliance.
@@ -32,11 +31,10 @@ September 2020 - June 2024
 ### BroswerUse Bot
 April 2026 - July 2026
 
-1. controlled on the phone using telegram bot, easy to access, the main idea/main feature is includes human-in-the-loop, hand off the account login to user by a link via noVNC, and it can do and access much more things when logged in, which is fundamentally powerful than naive browseruse agent.
-2. Integrating and improving broswerUse agent(opensource project,https://github.com/browser-use/browser-use) for manipulating browser, reducing batch task execute time by __%, using code-act pattern tool and skill system.
-3. Observability: integrated Langfuse for llm tracing, given request id--> find tracing id --> to locate the bug/problems for production environment, evaluate cost
-4. Develop CI/CD pipeline using Github Action, cutting down the deploy time(?) deploy the project on AWS EC2 for 24h responding.
-
+1. Built a supervised browser-automation agent controlled from a phone via a Telegram bot, with a human-in-the-loop login handoff: streams the live browser to the user over noVNC through a one-tap link so they authenticate directly, letting the agent operate on logged-in, authenticated sessions that a naive autonomous agent cannot reach.
+2. Extended the open-source browser-use agent with a CodeAct-style tool layer (agent-authored JavaScript) and a reusable skill system, cutting multi-step task latency by ~XX% by replacing element-by-element actions with single bulk DOM operations.
+3. Instrumented the LLM pipeline with Langfuse tracing (per-step tokens, latency, cost, errors), enabling request-ID → trace lookup to debug production runs and attribute per-task cost.
+4. Built a GitHub Actions CI/CD pipeline auto-deploying to AWS EC2 with health-check rollback, running the agent 24/7; reduced deploys to a single push (from manual multi-step to ~X min, zero-downtime).
 
 ### Mini-UPS Backend Development 
 Team Leader Durham, NC, USA

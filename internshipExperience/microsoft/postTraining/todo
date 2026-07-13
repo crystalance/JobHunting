@@ -1,0 +1,13 @@
+
+---7/8/2026---
+1. RL paper on widesearch https://arxiv.org/pdf/2602.04634
+2. what's the difference between vllm and verl?
+
+
+---7/7/2026---
+1. evaluate first lora trained model
+2. improve: 
+    1. we can generate more SFT data, designing data
+    2. use other model like qwen3-8B to do
+    3. just go for RL.
+

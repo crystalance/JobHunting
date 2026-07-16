@@ -10,7 +10,7 @@ September 2020 - June 2024
 ### Research Intern   --> Microsoft (03/2026 --> 07/2026)
 1. Architected HDMAS, a planner-free, decentralized multi-agent architecture using a lock-protected shared blackboard and distributed task claiming. Holding the GPT-5.4 Copilot backend constant, the three-agent system improved Row-F1 by 11.4% and Item-F1 by 8.0% over a single agent on 200 WideSearch tasks.
 2. Built an automated evaluation pipeline for Excel agents that decomposes tasks into atomic facts, generates and independently verifies reproducible ground truth; scaled to 50 tasks and 310 fact definitions while raising verified ground-truth coverage from 22.7% to 70.1%.
-3.Post-trained Qwen2.5-7B into a tool-using web-search agent via LoRA SFT + GRPO RL (verl/sglang/vLLM, 4×A100 FSDP2) — built the custom persistent-kernel tool loop, reward function, and eval harness — lifting WideSearch f1 from 0.05 → 0.35 (SFT) → 0.41 (RL), a +17% RL gain over the SFT baseline under variance-controlled evaluation.
+3. Post-trained Qwen2.5-7B into a batched code-act web-search agent (LoRA SFT + GRPO RL; verl/sglang/vLLM, 4×A100 FSDP2): SFT raised WideSearch f1 0.05→0.35 and taught for-loop batched search; GRPO cut agent LLM round-trips ~48% (10.6→5.5 turns/task) at equal accuracy — ~halving inference cost.
 
 ### Software Engineer Intern    --> Alibaba Cloud(07/2025 --> 11/2025)
 • Built an A2A protocol adapter for AgentScope Runtime, part of a 27K+-star open-source agent framework, enabling cross-framework agent interoperability through bidirectional JSON-RPC translation and asynchronous FastAPI streaming.

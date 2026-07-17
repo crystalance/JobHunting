@@ -107,3 +107,67 @@
 
 1.
 
+### Tip #23 — Count-array imbalance between two sequences (计数数组衡量两序列差异)
+
+1. **Pattern**: use a **single** count array (`int[10]` for digits, `int[26]` for letters, or a HashMap for general keys) where one sequence **increments** and the other **decrements**. The **sign** of each bucket tells you which side currently has a surplus. Lets you compare two multisets in **one pass, O(n) time, O(k) space** instead of two separate maps.
+
+2. **Example: [299. Bulls and Cows](https://leetcode.cn/problems/bulls-and-cows/)** — Topic: **Hash / counting** (+ String).
+
+   1. One `int[10]`. Walk both strings together:
+      1. position match (`secret[i] == guess[i]`) → `bulls++`, skip counting.
+      2. else `cnt[secret[i]]++` and `cnt[guess[i]]--`. When you `++` a digit that was previously negative, the guess side had a pending surplus → `cows++`; when you `--` a digit that was previously positive, the secret side did → `cows++`.
+
+   ```java
+   public String getHint(String secret, String guess) {
+       int bulls = 0, cows = 0;
+       int[] cnt = new int[10]; // + means secret surplus, - means guess surplus
+       for (int i = 0; i < secret.length(); i++) {
+           char s = secret.charAt(i), g = guess.charAt(i);
+           if (s == g) { bulls++; continue; }
+           if (cnt[s - '0']++ < 0) cows++;   // guess had this digit waiting
+           if (cnt[g - '0']-- > 0) cows++;   // secret had this digit waiting
+       }
+       return bulls + "A" + cows + "B";
+   }
+   ```
+
+   2. **Why cows needs BOTH checks — every pair is counted once, by whichever member arrives second**
+
+      1. A cow pair consists of one `d` from secret and one `d` from guess (at different positions). Scanning left to right, one of them shows up before the other. The rule of this solution is:
+
+         > **A pair is scored at the moment its second member arrives.**
+
+      2. There are only two cases:
+         1. **Guess's `d` appeared earlier, secret's `d` arrives now.** The earlier guess `d` made `h[d]` negative ("guess is owed a `d`"). Now the secret side shows `d`: check `h[s] < 0` → cow. This is the natural direction: "secret digit finds an unpaired guess digit."
+         2. **Secret's `d` appeared earlier, guess's `d` arrives now.** The earlier secret `d` made `h[d]` positive. Now the guess side shows `d`: check `h[g] > 0` → cow. This is the mirror direction: "guess digit finds an unpaired secret digit."
+
+      3. If you only kept the natural check (`h[s] < 0`), you'd only catch pairs where the guess member came first — and silently miss every pair where the **secret member came first**.
+         1. counter-example: `secret = "12"`, `guess = "21"` → should be `0A2B`. At idx 1, `h[2]=-1<0` scores the pair of 2s, and `h[1]=+1>0` scores the pair of 1s. With only one check you'd get `0A1B`.
+
+      4. No double counting: at one index the two checks fire for **different digit values** (`s != g` in the else branch), so they score two different pairs; and the `++`/`--` update afterwards "consumes" the waiting partner, so an earlier digit can never be matched twice.
+
+      5. One-liner to remember: **negative means guess is owed one, positive means secret is owed one; a cow is scored the instant a debt is repaid.**
+
+3. **Why it matters**: the same "one array tracks the imbalance between two sequences" idea appears all over anagram / balancing / matching problems — recognizing it generalizes far beyond 299.
+
+4. **Practice list (same idea)**
+
+   1. Direct anagram / count-matching:
+      1. [242. Valid Anagram](https://leetcode.cn/problems/valid-anagram/) — canonical: ++ for s, −− for t, all zero ⇒ anagram.
+      2. [383. Ransom Note](https://leetcode.cn/problems/ransom-note/)
+      3. [387. First Unique Character in a String](https://leetcode.cn/problems/first-unique-character-in-a-string/)
+      4. [350. Intersection of Two Arrays II](https://leetcode.cn/problems/intersection-of-two-arrays-ii/)
+      5. [1657. Determine if Two Strings Are Close](https://leetcode.cn/problems/determine-if-two-strings-are-close/)
+   2. Sliding window + count-balance:
+      1. [438. Find All Anagrams in a String](https://leetcode.cn/problems/find-all-anagrams-in-a-string/)
+      2. [567. Permutation in String](https://leetcode.cn/problems/permutation-in-string/)
+      3. [76. Minimum Window Substring](https://leetcode.cn/problems/minimum-window-substring/) — track a `need` count + a `missing` counter (the imbalance).
+   3. Counting-array to find mismatches:
+      1. [645. Set Mismatch](https://leetcode.cn/problems/set-mismatch/)
+      2. [2215. Find the Difference of Two Arrays](https://leetcode.cn/problems/find-the-difference-of-two-arrays/)
+      3. [389. Find the Difference](https://leetcode.cn/problems/find-the-difference/) — counting or XOR.
+   4. XOR "balancing" variant (same imbalance idea, different operator):
+      1. [136. Single Number](https://leetcode.cn/problems/single-number/) / [137](https://leetcode.cn/problems/single-number-ii/) / [260](https://leetcode.cn/problems/single-number-iii/) — pairs cancel, leftover is the imbalance.
+
+5. Suggested order: **242 → 383 → 438 → 567 → 76**, then **645 / 389 / 136** for the counting-vs-XOR contrast.
+

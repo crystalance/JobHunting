@@ -1,0 +1,22 @@
+
+---07/14/2026---
+1. training: should record the detail numbers, 
+    1. add search cache --> improve training speed?
+    2. sync training code
+  ---> pipeline
+    1. sync training code
+
+2. Learn nanochat --> figure out next phase 
+    1. 模型架构/attention
+    2. base_train
+    3. optim
+    4. engine --> KV cache --> figure out
+    5. SFT
+    6. GRPO 
+
+3. leetcode
+    1. 
+
+4. browser use bot
+    1. latency
+    2. architecture 

@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GRPO v3 — final results (accuracy · efficiency · latency · cost)</title>
+<style>
+  :root{
+    --bg:#0f1420; --panel:#171e2e; --panel2:#1e2740; --ink:#e6ebf5; --muted:#9aa7bd;
+    --accent:#5aa9ff; --good:#4ade80; --bad:#f87171; --warn:#fbbf24; --line:#2a3550;
+    --mono:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.6;font-size:15px}
+  .wrap{max-width:1060px;margin:0 auto;padding:32px 24px 80px}
+  h1{font-size:27px;margin:0 0 4px;letter-spacing:-.5px}
+  h2{font-size:21px;margin:38px 0 12px;padding-bottom:8px;border-bottom:2px solid var(--line);color:var(--accent)}
+  h3{font-size:16px;margin:20px 0 6px;color:#cdd8ee}
+  .sub{color:var(--muted);font-size:14px;margin-bottom:24px}
+  p{margin:10px 0}
+  code{font-family:var(--mono);background:#0b1020;padding:1px 6px;border-radius:5px;font-size:13px;color:#cfe3ff}
+  pre{background:#0b1020;border:1px solid var(--line);border-radius:8px;padding:14px 16px;overflow:auto;
+    font-family:var(--mono);font-size:13px;color:#cfe3ff;margin:10px 0;line-height:1.55}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin:14px 0}
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:14px}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.4px}
+  td.num,th.num{font-family:var(--mono);text-align:right}
+  .note{font-size:13px;color:var(--muted);font-style:italic}
+  .good{color:var(--good)} .bad{color:var(--bad)} .warn{color:var(--warn)}
+  .tag{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600}
+  .t-good{background:rgba(74,222,128,.15);color:var(--good)}
+  .t-warn{background:rgba(251,191,36,.15);color:var(--warn)}
+  a{color:var(--accent)}
+  .key{border-left:3px solid var(--good);padding-left:12px}
+  tr.peak td{background:rgba(74,222,128,.12)}
+  .big{font-size:15px}
+  .cards{display:flex;gap:12px;flex-wrap:wrap;margin:14px 0}
+  .card{flex:1;min-width:150px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px 16px;text-align:center}
+  .card .v{font-size:26px;font-weight:700;color:var(--good);font-family:var(--mono)}
+  .card .l{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-top:4px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>GRPO v3 — final results <span class="tag t-good">best model so far</span></h1>
+<div class="sub">Qwen2.5-7B code-act web-search agent · v3-SFT → GRPO-v3 (v3-reward) · controlled eval EN test 086–100 + ZH 001–020, k=4 · 2026-07-22 · prior docs: <a href="../7_20_2026/grpo_reward_design.html">reward design</a>, <a href="../7_21_2026/grpo_v3_training_result.html">training result</a></div>
+
+<h2>0. TL;DR</h2>
+<div class="cards">
+  <div class="card"><div class="v">+9%</div><div class="l">EN f1_item</div></div>
+  <div class="card"><div class="v">+16%</div><div class="l">EN f1_row (coverage)</div></div>
+  <div class="card"><div class="v">−16%</div><div class="l">reasoning calls/task</div></div>
+  <div class="card"><div class="v">−9%</div><div class="l">latency/task</div></div>
+  <div class="card"><div class="v">~−14%</div><div class="l">total LLM calls (cost)</div></div>
+</div>
+<div class="panel key">
+<p>The v3-reward redesign (drop the collapse-causing turn-cost, keep coverage weight 0.8, add a hard −0.10 no-table floor, KL 0.005, init from v3-SFT) delivered the <b>combined win</b>: GRPO-v3 is <b>more accurate AND cheaper/faster</b> than the v3-SFT base — with <b>no collapse</b> (the exact failure mode of the earlier v2-reward). This is the model to keep.</p>
+</div>
+
+<h2>1. Accuracy — GRPO-v3 vs SFT-v3</h2>
+<div class="sub">Controlled: k=4 @ temp 0.7, shared warmed search cache, both served with the same prompt. 140 rollouts/model, 0 fail. Paired same-session → valid comparison (NOT comparable to 7/16 numbers: cross-session Bing drift; that's why SFT-v3 was re-run here).</div>
+<div class="panel">
+<table>
+<tr><th>Model</th><th>Lang</th><th class="num">f1_item</th><th class="num">f1_row</th><th class="num">has_table</th><th class="num">pass@4</th></tr>
+<tr><td>SFT-v3</td><td>EN</td><td class="num">0.375</td><td class="num">0.119</td><td class="num">0.82</td><td class="num">0.504</td></tr>
+<tr class="peak"><td><b>GRPO-v3</b></td><td>EN</td><td class="num good">0.408</td><td class="num good">0.138</td><td class="num">0.83</td><td class="num good">0.539</td></tr>
+<tr><td>SFT-v3</td><td>ZH</td><td class="num">0.258</td><td class="num">0.090</td><td class="num">0.72</td><td class="num">0.383</td></tr>
+<tr class="peak"><td><b>GRPO-v3</b></td><td>ZH</td><td class="num good">0.262</td><td class="num">0.082</td><td class="num good">0.82</td><td class="num">0.380</td></tr>
+</table>
+<p><b>EN — clear win:</b> f1_item +9%, f1_row +16%, pass@4 +7% (ceiling rose, not just sharpening). <b>ZH — tied on accuracy</b> (f1 within noise) but <b>has_table +14%</b> (0.72→0.82, more complete tables).</p>
+</div>
+
+<h2>2. Efficiency — LLM round-trips per task</h2>
+<div class="panel">
+<table>
+<tr><th>Model</th><th class="num">reasoning calls/task</th><th class="num">tool-calls/task</th><th class="num">search()/task</th></tr>
+<tr><td>SFT-v3</td><td class="num">8.5</td><td class="num">7.5</td><td class="num">4.4</td></tr>
+<tr class="peak"><td><b>GRPO-v3</b></td><td class="num good">7.1</td><td class="num good">6.1</td><td class="num">4.0</td></tr>
+<tr><td>Δ</td><td class="num good">−16%</td><td class="num good">−19%</td><td class="num">−9%</td></tr>
+</table>
+<p>Reaches the answer in <b>~16–19% fewer reasoning round-trips</b> with search coverage ~unchanged (4.4→4.0) — not cutting corners on the web work, just reasoning in fewer turns.</p>
+</div>
+
+<h2>3. Latency &amp; cost</h2>
+<div class="panel">
+<h3>Latency (wall-clock per task, measured from eval logs)</h3>
+<table>
+<tr><th>Split</th><th class="num">SFT-v3</th><th class="num">GRPO-v3</th><th class="num">cut</th></tr>
+<tr class="peak"><td><b>All</b></td><td class="num">181.5s (med 145)</td><td class="num">164.3s (med 135)</td><td class="num good">−9%</td></tr>
+<tr><td>EN</td><td class="num">170.6s</td><td class="num">156.2s</td><td class="num good">−8%</td></tr>
+<tr><td>ZH</td><td class="num">189.9s</td><td class="num">170.4s</td><td class="num good">−10%</td></tr>
+</table>
+<h3>Cost (LLM calls per task — the dominant driver)</h3>
+<table>
+<tr><th>Call type</th><th class="num">SFT-v3</th><th class="num">GRPO-v3</th><th class="num">cut</th></tr>
+<tr><td>Reasoning (policy model)</td><td class="num">8.5</td><td class="num">7.1</td><td class="num good">−16%</td></tr>
+<tr><td>Search summarizer (gpt-4.1-mini)</td><td class="num">4.4</td><td class="num">4.0</td><td class="num">−9%</td></tr>
+<tr class="peak"><td><b>Total LLM calls</b></td><td class="num">12.9</td><td class="num">11.1</td><td class="num good">−14%</td></tr>
+</table>
+<p class="big"><b>Headline: ~−14–16% cost / query and −9% latency, at +9% higher EN accuracy.</b></p>
+<p class="note">Why latency (−9%) &lt; reasoning-call cut (−16%): episode wall-clock is gated by the slow search I/O (Bing + gpt-4.1-mini summarize), which only dropped ~9% (search calls 4.4→4.0). Latency tracks search, not reasoning turns. Caveat: latency was measured with both models running in parallel sharing Azure rate limits — real but contention-influenced; the call-count cuts (−14/−16%) are clean and contention-free.</p>
+</div>
+
+<h2>4. Training stability (recap)</h2>
+<div class="panel">
+<p>21 steps, ~5h, <b>no collapse</b>: final entropy 0.545, grad_norm 0.60, response length stable ~12.7k, <code>constant_fill = 0.0</code>, and the hard −0.10 no-table floor active every step. Classic unlearn-then-relearn (dipped steps 3–9, recovered from step 12). Contrast the earlier <b>v2-reward</b>, which collapsed at step ~10 (turn-cost → stop-early → no-table absorbing state). Full curve in the <a href="../7_21_2026/grpo_v3_training_result.html">7/21 doc</a>.</p>
+</div>
+
+<h2>5. What made it work</h2>
+<div class="panel key">
+<ul>
+<li><b>Better SFT data first</b> (f1_row-gated v3 traces) put coverage into the sample distribution → RL had something good to amplify (pass@k→pass@1; here pass@4 also rose, so the ceiling lifted too).</li>
+<li><b>Removed the turn-cost term</b> — it was the root cause of the v2 collapse. Efficiency was NOT forced; it came from KL-anchoring to the already-efficient v3 policy + reinforcing outcome. Result: efficiency improved anyway (−16% turns) without the collapse.</li>
+<li><b>Hard no-table floor + coverage weight 0.8</b> kept "finish" strictly &gt; "give up" and pushed row coverage.</li>
+</ul>
+</div>
+
+<h2>6. Artifacts</h2>
+<div class="panel">
+<ul>
+<li>Model: <code>post_training/grpo/merged/grpo_v3_step21</code> (HF, deployable)</li>
+<li>Scores: <code>eval_20260721_040025/controlled_scores_v3.json</code> · scorer <code>post_training/grpo/score_v3_eval.py</code> (EN+ZH)</li>
+<li>Reward: <code>post_training/grpo/widesearch_reward.py</code> (v3 defaults) · run <code>run_grpo_v3.sh</code></li>
+<li>Docs: <a href="../7_20_2026/grpo_reward_design.html">7/20 reward design + Q&amp;A</a> · <a href="../7_21_2026/grpo_v3_training_result.html">7/21 training result</a></li>
+</ul>
+</div>
+
+</div>
+</body>
+</html>

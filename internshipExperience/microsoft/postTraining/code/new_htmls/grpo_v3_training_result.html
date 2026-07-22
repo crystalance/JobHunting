@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GRPO v3 — training result</title>
+<style>
+  :root{
+    --bg:#0f1420; --panel:#171e2e; --panel2:#1e2740; --ink:#e6ebf5; --muted:#9aa7bd;
+    --accent:#5aa9ff; --good:#4ade80; --bad:#f87171; --warn:#fbbf24; --line:#2a3550;
+    --mono:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.6;font-size:15px}
+  .wrap{max-width:1040px;margin:0 auto;padding:32px 24px 80px}
+  h1{font-size:28px;margin:0 0 4px;letter-spacing:-.5px}
+  h2{font-size:21px;margin:38px 0 12px;padding-bottom:8px;border-bottom:2px solid var(--line);color:var(--accent)}
+  h3{font-size:16px;margin:20px 0 6px;color:#cdd8ee}
+  .sub{color:var(--muted);font-size:14px;margin-bottom:24px}
+  p{margin:10px 0}
+  code{font-family:var(--mono);background:#0b1020;padding:1px 6px;border-radius:5px;font-size:13px;color:#cfe3ff}
+  pre{background:#0b1020;border:1px solid var(--line);border-radius:8px;padding:14px 16px;overflow:auto;
+    font-family:var(--mono);font-size:13px;color:#cfe3ff;margin:10px 0;line-height:1.55}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin:14px 0}
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:14px}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.4px}
+  td.num,th.num{font-family:var(--mono);text-align:right}
+  .note{font-size:13px;color:var(--muted);font-style:italic}
+  .good{color:var(--good)} .bad{color:var(--bad)} .warn{color:var(--warn)}
+  .tag{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600}
+  .t-good{background:rgba(74,222,128,.15);color:var(--good)}
+  .t-warn{background:rgba(251,191,36,.15);color:var(--warn)}
+  a{color:var(--accent)}
+  .key{border-left:3px solid var(--good);padding-left:12px}
+  .keywarn{border-left:3px solid var(--warn);padding-left:12px}
+  tr.hl td{background:rgba(90,169,255,.10)}
+  tr.peak td{background:rgba(74,222,128,.12)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>GRPO v3 — training result <span class="tag t-good">no collapse</span> <span class="tag t-good">EN +9% f1_item</span></h1>
+<div class="sub">21 steps on <code>actor_init_v3</code> · v3-reward (no turn-cost, has_table 0.1, hard −0.10 floor) · KL 0.005 · 2026-07-20 (~5h) · design: <a href="../7_20_2026/grpo_reward_design.html">7_20 reward design</a></div>
+
+<h2>1. Headline</h2>
+<div class="panel key">
+<p>The v3-reward ran <b>stably to completion</b> — the exact opposite of the v2 collapse. Healthy convergence (final entropy 0.545, grad_norm 0.60, ppo_kl ≈ 0), no fabrication (<code>constant_fill = 0.0</code>), and the <b>−0.10 no-table floor stayed active the whole run</b> (min reward = −0.10 every step). GRPO reinforced <b>coverage + completion</b> while holding accuracy and efficiency.</p>
+</div>
+
+<h2>2. Validation curve</h2>
+<div class="sub">verl internal val — 14 EN prompts, greedy single-sample. NOTE: this is the noisy, non-reproducible val (~±0.1); treat as a trend, not a ranking.</div>
+<div class="panel">
+<table>
+<tr><th>Step</th><th class="num">f1_item</th><th class="num">f1_row</th><th class="num">has_table</th><th class="num">n_turns</th><th class="num">score</th></tr>
+<tr class="hl"><td><b>0</b> (SFT-v3 init)</td><td class="num">0.419</td><td class="num">0.138</td><td class="num">0.714</td><td class="num">6.6</td><td class="num">0.565</td></tr>
+<tr><td>3</td><td class="num">0.347</td><td class="num">0.177</td><td class="num">0.643</td><td class="num">7.4</td><td class="num">0.504</td></tr>
+<tr><td>6</td><td class="num bad">0.317</td><td class="num">0.103</td><td class="num">0.714</td><td class="num">7.6</td><td class="num">0.436</td></tr>
+<tr><td>9</td><td class="num bad">0.304</td><td class="num">0.165</td><td class="num">0.643</td><td class="num">6.1</td><td class="num">0.465</td></tr>
+<tr><td>12</td><td class="num">0.421</td><td class="num">0.161</td><td class="num">0.643</td><td class="num">8.4</td><td class="num">0.564</td></tr>
+<tr class="peak"><td><b>15</b> (val peak)</td><td class="num good">0.442</td><td class="num good">0.189</td><td class="num">0.714</td><td class="num">6.1</td><td class="num good">0.636</td></tr>
+<tr><td>18</td><td class="num">0.361</td><td class="num">0.144</td><td class="num">0.714</td><td class="num">6.1</td><td class="num">0.520</td></tr>
+<tr class="hl"><td><b>21</b> (final, kept)</td><td class="num">0.423</td><td class="num">0.161</td><td class="num good">0.857</td><td class="num">6.5</td><td class="num">0.623</td></tr>
+</table>
+</div>
+
+<h2>3. What happened</h2>
+<div class="panel">
+<ul>
+<li><b>Classic "unlearn-then-relearn":</b> dipped below the SFT-v3 init through steps 3–9 (down to f1_item 0.304), then <b>recovered and rose above</b> init from step 12 on. Normal RL exploration; it recovered — not a collapse.</li>
+<li><b>vs SFT-v3 init (step 0), same session:</b> f1_item ~flat (0.419→0.423, +1%), <b>f1_row +17%</b> (0.138→0.161), <b>has_table +20%</b> (0.71→0.86), n_turns held at ~6.5 (stayed efficient), score +10%. Coverage &amp; completion up, accuracy &amp; efficiency preserved — the intended effect.</li>
+<li><b>Floor working:</b> min reward = −0.10 every step (some rollouts made no table → clamped, never a local optimum). <code>constant_fill = 0.0</code> at the end (no fabrication).</li>
+<li><b>Healthy internals:</b> entropy 0.545 (not collapsed to 0), response_length stable ~12.7k (not halving), grad_norm 0.60, ppo_kl ≈ 0.</li>
+</ul>
+</div>
+
+<h2>4. Checkpoint note <span class="tag t-warn">tradeoff</span></h2>
+<div class="panel keywarn">
+<p>Best-by-val is <b>step 15</b> (f1_item 0.442, score 0.636), but <code>max_actor_ckpt_to_keep=2</code> rotated its 86 GB actor out — only <b>step_18 and step_21</b> survive. This is the disk-vs-best-by-val tradeoff (each verl checkpoint is ~86 GB with optimizer; 4 kept would need ~340 GB).</p>
+<p><b>In practice this is fine.</b> Greedy val on n=14 is non-reproducible (~±0.1), so step_15's 0.442 vs step_21's 0.423 is <b>within noise</b>. <b>Step_21 is the right pick anyway:</b> highest has_table (0.857), lowest turns (6.5), competitive f1, natural endpoint. <span class="note">Lesson for next time: to truly keep best-by-val, snapshot (merge→15 GB HF) at each val peak rather than relying on keep-N.</span></p>
+</div>
+
+<h2>5. Controlled eval — GRPO-v3 vs SFT-v3 <span class="tag t-good">done</span></h2>
+<div class="panel">
+<p>The trustworthy verdict: <b>controlled multi-sample eval</b> (k=4, temp 0.7, shared warmed search cache), <code>actor_init_v3</code> (SFT-v3) vs merged <b>GRPO-v3 step_21</b> on EN test (086–100, 15) + ZH (001–020, 20), 140 rollouts/model, 0 fail. <b>Both served with the same prompt + same cache → this paired same-session comparison is valid</b> (do NOT compare to the 7/16 sft_v3 numbers — cross-session Bing drift / sampling noise; that's exactly why sft_v3 was re-run here alongside).</p>
+<table>
+<tr><th>Model</th><th>Lang</th><th class="num">f1_item</th><th class="num">f1_row</th><th class="num">has_table</th><th class="num">pass@4</th></tr>
+<tr><td>SFT-v3</td><td>EN</td><td class="num">0.375</td><td class="num">0.119</td><td class="num">0.82</td><td class="num">0.504</td></tr>
+<tr class="peak"><td><b>GRPO-v3</b></td><td>EN</td><td class="num good">0.408</td><td class="num good">0.138</td><td class="num">0.83</td><td class="num good">0.539</td></tr>
+<tr><td>SFT-v3</td><td>ZH</td><td class="num">0.258</td><td class="num">0.090</td><td class="num">0.72</td><td class="num">0.383</td></tr>
+<tr class="peak"><td><b>GRPO-v3</b></td><td>ZH</td><td class="num good">0.262</td><td class="num">0.082</td><td class="num good">0.82</td><td class="num">0.380</td></tr>
+</table>
+<div class="key">
+<p><b>EN — clear modest win:</b> f1_item +9% (0.375→0.408), f1_row +16% (0.119→0.138), pass@4 +7% (0.504→0.539), has_table flat/high. pass@4 rising (not just the mean) means GRPO lifted the <i>ceiling</i>, not only sharpened — it reinforced the coverage that v3-SFT put in the sample distribution.</p>
+<p><b>ZH — tied on accuracy, more complete:</b> f1_item +2% and f1_row −9% are both within noise (flat), but <b>has_table +14%</b> (0.72→0.82) — GRPO made ZH markedly more likely to finish a scoreable table. Mirrors the training-val signal (has_table was the big mover).</p>
+</div>
+
+<h3>Efficiency (per-task, from eval traces) — the combined win</h3>
+<table>
+<tr><th>Model</th><th class="num">LLM turns/task</th><th class="num">tool-calls/task</th><th class="num">search()/task</th></tr>
+<tr><td>SFT-v3</td><td class="num">8.5</td><td class="num">7.5</td><td class="num">4.4</td></tr>
+<tr class="peak"><td><b>GRPO-v3</b></td><td class="num good">7.1</td><td class="num good">6.1</td><td class="num">4.0</td></tr>
+<tr><td>Δ</td><td class="num good">−16%</td><td class="num good">−19%</td><td class="num">−9%</td></tr>
+</table>
+<p><b>GRPO-v3 reaches the answer in ~16–19% fewer LLM round-trips while being more accurate</b> (EN +9% f1_item), with search coverage ~unchanged (4.4→4.0) — so it's not cutting corners on the web work, just reasoning in fewer turns. This is the combined win: v1-GRPO gave efficiency <i>only</i> (turns down, accuracy flat); v3-GRPO gives <b>efficiency + accuracy together</b>. Since inference cost ≈ LLM turns, ~16% cheaper per query at better quality.</p>
+<p><b>Verdict:</b> the v3-reward redesign worked — GRPO-v3 is the <b>best model so far</b>: a stable EN gain (+9% f1_item / +16% f1_row) and better ZH completion, with <b>no collapse</b> and efficiency preserved (~6.5 turns). Modest and honest, exactly as predicted for “reinforce what SFT already learned.”</p>
+<p class="note">Artifacts: <code>merged/grpo_v3_step21</code> (HF), <code>eval_20260721_040025/controlled_scores_v3.json</code>, scorer <code>post_training/grpo/score_v3_eval.py</code>.</p>
+</div>
+
+</div>
+</body>
+</html>

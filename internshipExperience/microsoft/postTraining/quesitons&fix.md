@@ -231,3 +231,65 @@ Across the 21 steps the policy did an "unlearn-then-relearn": dipped steps 3–9
 
 Want me to add this "anatomy of a GRPO step" section into the handover doc (or the reward-design doc) so it's captured for the next person?
 ---
+
+2. what's the difference between reasoning calls and tool calls? what do you think that improves models efficiency and why? Modelreasoning calls/tasktool-calls/tasksearch()/taskSFT-v38.57.54.4GRPO-v37.16.14.0Δ−16%−19%−9%?
+
+---
+Great question — the distinction is the key to *why* this is an efficiency win and not just "did less work."
+
+## The three metrics, precisely
+
+They're measured from the agent trace (`conversation[]`):
+
+| Metric | What it counts | Cost meaning |
+|---|---|---|
+| **Reasoning calls** | Number of **assistant turns** = times the **policy LLM is invoked** (one generation each) | The expensive unit — one full LLM forward pass |
+| **Tool calls** | Number of `execute_python` requests the model emits | The *action* per turn (usually 1 per reasoning turn) |
+| **search() calls** | Times the executed code calls `search_client.search(...)` | The actual web-search work |
+
+### Why the numbers stack the way they do (SFT-v3: 8.5 / 7.5 / 4.4)
+- **Reasoning (8.5) > tool-calls (7.5):** every turn is an LLM call, but the *last* turn(s) write the final answer table with **no tool call** — so tool-calls ≈ reasoning − the answer-writing turn. ~1 turn is "pure answer."
+- **Tool-calls (7.5) > search() (4.4):** not every `execute_python` searches. Many code blocks **parse / aggregate / dedupe / write the output CSV** rather than search. And when it *does* search, code-act **batches** — one `search_client.search([q1…q20])` counts as one search() but fires 20 queries. So search() counts search *invocations*, not queries.
+
+So the hierarchy is: **each reasoning call → (maybe) one tool call → (maybe) several batched search() calls → (maybe) 20 queries each.** One reasoning turn can drive a *lot* of web work.
+
+## What "reasoning call" vs "tool call" really is
+
+- A **reasoning call** = the model reads the *entire conversation so far* (system prompt + all prior code + all prior search results, which keeps growing) and autoregressively generates its next move. This is a **full LLM decode over a long, growing context** — the dominant compute and latency unit.
+- A **tool call** = the *content* of that generation — the code the model wants run. It's cheap (a local kernel executes it); the LLM already paid to produce it.
+
+**Key point: cost/latency scales with reasoning calls, not tool calls or searches.** Each extra reasoning turn re-processes the whole (long) context again, so cost is roughly *superlinear* in the number of turns.
+
+## What improves efficiency, and why
+
+**The lever is fewer reasoning calls (8.5 → 7.1, −16%) at the same search coverage (4.4 → 4.0, −9%).** Two things combine:
+
+**1. The code-act batched pattern (taught by SFT) — the structural enabler.**
+Compare two ways to gather 40 facts:
+
+```python
+# one-at-a-time (many reasoning turns): each search = a new LLM turn
+turn1: search("fact 1")   # LLM call
+turn2: search("fact 2")   # LLM call
+... 40 turns → 40 reasoning calls
+```
+```python
+# code-act batched (few reasoning turns): one code block does it all
+turn1:
+  entities = [...]                                  # enumerate
+  queries  = [f"{e} <attr> source" for e in entities]
+  for i in range(0, len(queries), 20):
+      print(search_client.search(queries[i:i+20]))  # batched
+# → all 40 gathered in ONE reasoning turn
+```
+The batched version does the **same web work in far fewer LLM round-trips**. That's why "search() barely dropped but reasoning calls dropped a lot" — it's consolidating turns, not cutting corners.
+
+**2. GRPO (on top of SFT) — sharpened toward finishing in fewer, denser turns.**
+SFT plants the pattern; GRPO reinforces it. Among the model's *own* rollouts, GRPO gave positive advantage to episodes that reached high coverage/accuracy, and the model's efficient rollouts (plan → batch-search → write) tend to be the ones that succeed. So probability mass shifted **away from meandering** — redundant reasoning turns, one-off follow-up searches, retries after malformed code — and toward tight trajectories. Because the reward is outcome-based and KL-anchored to the already-efficient SFT policy, efficiency emerged *without* penalizing turns (which is exactly what collapsed the v2 reward).
+
+## Why this specifically cuts cost & latency
+- **Cost** ≈ tokens generated + tokens processed. Each reasoning call re-reads the entire growing context, so total tokens ∝ (turns × context length) — dropping 16% of turns removes 16% of those expensive full-context passes → ~−14–16% cost.
+- **Latency** dropped less (−9%) because per-episode wall-clock is gated by the *slow search I/O* (Bing + gpt-4.1-mini summarize), and search invocations only fell ~9%. So latency tracks search I/O, while cost tracks reasoning calls.
+
+**Bottom line:** the efficiency comes from **doing the same amount of searching in fewer LLM reasoning turns** (via batched code-act), and GRPO tightened that further — cheaper and faster at *higher* accuracy, not by searching less.
+---

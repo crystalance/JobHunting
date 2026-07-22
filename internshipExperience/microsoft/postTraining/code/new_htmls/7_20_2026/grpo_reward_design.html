@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GRPO Reward Design — v1 vs failure vs new</title>
+<style>
+  :root{
+    --bg:#0f1420; --panel:#171e2e; --panel2:#1e2740; --ink:#e6ebf5; --muted:#9aa7bd;
+    --accent:#5aa9ff; --good:#4ade80; --bad:#f87171; --warn:#fbbf24; --line:#2a3550;
+    --mono:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.6;font-size:15px}
+  .wrap{max-width:1080px;margin:0 auto;padding:32px 24px 80px}
+  h1{font-size:28px;margin:0 0 4px;letter-spacing:-.5px}
+  h2{font-size:21px;margin:40px 0 12px;padding-bottom:8px;border-bottom:2px solid var(--line);color:var(--accent)}
+  h3{font-size:16px;margin:20px 0 6px;color:#cdd8ee}
+  .sub{color:var(--muted);font-size:14px;margin-bottom:24px}
+  p{margin:10px 0}
+  code{font-family:var(--mono);background:#0b1020;padding:1px 6px;border-radius:5px;font-size:13px;color:#cfe3ff}
+  pre{background:#0b1020;border:1px solid var(--line);border-radius:8px;padding:14px 16px;overflow:auto;
+    font-family:var(--mono);font-size:13px;color:#cfe3ff;margin:10px 0;line-height:1.55}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin:14px 0}
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:14px}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.4px}
+  td.num{font-family:var(--mono);text-align:right}
+  .note{font-size:13px;color:var(--muted);font-style:italic}
+  .good{color:var(--good)} .bad{color:var(--bad)} .warn{color:var(--warn)}
+  .tag{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600}
+  .t-good{background:rgba(74,222,128,.15);color:var(--good)}
+  .t-bad{background:rgba(248,113,113,.15);color:var(--bad)}
+  .t-warn{background:rgba(251,191,36,.15);color:var(--warn)}
+  a{color:var(--accent)}
+  .key{border-left:3px solid var(--good);padding-left:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>GRPO Reward Design — v1 vs failure vs new</h1>
+<div class="sub">Comparing the original reward, the version that collapsed, and the new (v3) design · 2026-07-20 · lessons from <a href="../7_15_2026/rl_first_collapse_lessons.md">7_15 collapse</a>, results in <a href="../7_16_2026/v3_sft_vs_v2.html">7_16 v3 SFT</a></div>
+
+<!-- ===================== -->
+<h2>1. The three reward versions at a glance</h2>
+<div class="panel">
+<table>
+<tr><th>Term</th><th>v1 — original <span class="tag t-good">stable</span></th><th>v2 — failure <span class="tag t-bad">collapsed</span></th><th>v3 — new <span class="tag t-warn">proposed</span></th></tr>
+<tr><td><code>f1_item</code> (cell correctness)</td><td class="num">1.0</td><td class="num">1.0</td><td class="num">1.0</td></tr>
+<tr><td><code>f1_row</code> (row coverage)</td><td class="num">0.5</td><td class="num">0.8</td><td class="num good">0.8</td></tr>
+<tr><td><code>has_table</code> (produced a table)</td><td class="num">0.1</td><td class="num">0.05</td><td class="num">0.1</td></tr>
+<tr><td><code>turn_cost</code> (−, efficiency)</td><td class="num">0.1 <span class="warn">(inert)</span></td><td class="num bad">0.1 <b>(active, budget 12)</b></td><td class="num good">0 <b>(removed)</b></td></tr>
+<tr><td><code>constant_fill</code> (−, anti-fabrication)</td><td class="num">0.1</td><td class="num">0.1</td><td class="num">0.1</td></tr>
+<tr><td>KL coef</td><td class="num">0.001</td><td class="num bad">0.01</td><td class="num good">0.005</td></tr>
+<tr><td>Init policy</td><td>SFT-v2</td><td>SFT-v2</td><td class="good">SFT-<b>v3</b></td></tr>
+<tr><td>Checkpointing</td><td>keep-all</td><td class="bad">keep-last-2</td><td class="good">best-by-val</td></tr>
+<tr><td><b>Outcome</b></td><td>stable; −48% turns (emergent); no held-out f1 gain</td><td class="bad">collapsed @ step 10 → no table</td><td>—</td></tr>
+</table>
+</div>
+
+<!-- ===================== -->
+<h2>2. v1 — original (stable, but limited)</h2>
+<div class="panel">
+<pre>R = 1.0·f1_item + 0.5·f1_row + 0.1·has_table − 0.1·turn_cost − 0.1·constant_fill
+    turn_cost = min(n_turns/20, 1)      # INERT: n_turns never plumbed -> always 0</pre>
+<p><b>Behaviour:</b> stable for 30 steps. The turn-cost term was <b>dead</b> (verl never passed <code>num_turns</code>), so efficiency was never explicitly rewarded — yet turns still dropped ~48% as an <i>emergent</i> effect of chasing outcome reward. Held-out f1 did <b>not</b> improve (bounded by coverage/search).</p>
+<p class="note">Lesson: this reward is safe but under-powered for coverage; the row term (0.5) is too weak and the efficiency term does nothing.</p>
+</div>
+
+<!-- ===================== -->
+<h2>3. v2 — the failure (collapsed)</h2>
+<div class="panel">
+<pre>R = 1.0·f1_item + 0.8·f1_row + 0.05·has_table − 0.1·turn_cost − 0.1·constant_fill
+    turn_cost = min(n_turns/12, 1)      # ACTIVE: n_turns = count("&lt;tool_call&gt;")
+    KL 0.001 -> 0.01</pre>
+<p><b>What we changed:</b> up-weighted coverage (0.5→0.8), shrank has_table, and <b>activated the turn-cost</b> (plumbed real turns, tighter budget) to make efficiency deliberate.</p>
+<p><b>What happened:</b> val f1 rose at step 5 (0.24→0.32) then <b>collapsed</b> — by step 15 the policy wrote <b>no table at all</b> (has_table→0), emitting one search tool-call and stopping.</p>
+<div class="key">
+<p><b>Root cause — the turn-cost created a perverse "stop early" incentive.</b> GRPO minimized the turn penalty by doing one search and terminating. That produces no table (reward ≈ 0), but once <i>every</i> rollout in a batch collapsed to no-table, all rewards were ~equal → advantage ≈ 0 → <b>no gradient to recover</b>. A reward-hacking → entropy/length-collapse absorbing state. Making it worse: <code>keep-last-2</code> checkpointing deleted the one good (step-5) checkpoint.</p>
+</div>
+</div>
+
+<!-- ===================== -->
+<h2>4. v3 — new design <span class="tag t-warn">proposed</span></h2>
+<div class="panel">
+<pre>R = 1.0·f1_item + 0.8·f1_row + 0.1·has_table − 0.1·constant_fill
+    # NO turn-cost term.
+    KL = 0.005 ;  init = SFT-v3 ;  best-by-val checkpointing</pre>
+
+<h3>Design principles (each ties to a lesson)</h3>
+<table>
+<tr><th>Decision</th><th>Why</th></tr>
+<tr><td><b>Remove the turn-cost term entirely</b></td><td>It caused the collapse. Efficiency must NOT fight task completion. The −48% turn win in v1 was emergent &amp; safe — do not force it via a penalty.</td></tr>
+<tr><td><b>Keep <code>f1_row</code> = 0.8</b> (coverage)</td><td>This part of v2 was correct — coverage is the bottleneck. Now the base policy (SFT-v3) already produces high-coverage rollouts, so RL can reinforce them (close the pass@k→pass@1 gap).</td></tr>
+<tr><td><b><code>has_table</code> back to 0.1</b></td><td>A real reward for producing a scoreable table. With no turn-cost, "finish" always scores ≥ "not finish" → the no-table absorbing state is removed.</td></tr>
+<tr><td><b>Init from SFT-<b>v3</b></b></td><td>RL only reinforces behaviours already in the sample distribution; SFT-v3 now has good coverage in-distribution (f1_row +36/48% over v2), so coverage-weighted RL has something to amplify.</td></tr>
+<tr><td><b>KL = 0.005</b> (between v1's 0.001 and v2's 0.01)</td><td>Anchor to the strong SFT-v3 policy to prevent drift/regression-tax, without the over-constraint that (with turn-cost) helped collapse.</td></tr>
+<tr><td><b>best-by-val checkpointing</b> + frequent saves</td><td>Unstable RL can collapse; never rely on keep-last. Save often, select the best-on-val checkpoint (v2 deleted its only good one).</td></tr>
+</table>
+
+<h3>Anti-collapse guardrails (process, not reward)</h3>
+<ul>
+<li>Monitor <code>actor/entropy</code>, <code>response_length</code>, and val <code>has_table</code> live; the tell-tale of the v2 collapse was response length halving + has_table→0.</li>
+<li>Optional hard floor: if a rollout produces <b>no table</b>, clamp R to a clearly-dominated value (e.g. −0.1) so "no table" can never be a local optimum. (Kept optional — with turn-cost gone the soft <code>has_table</code> term already orders finish &gt; not-finish.)</li>
+<li>Short first (e.g. 10–15 steps), verify val f1 &amp; has_table are flat-or-up before committing to a long run.</li>
+</ul>
+
+<h3>Why v3-reward ≈ "v1 + stronger coverage, minus the dead/dangerous efficiency term"</h3>
+<p>Net: it is the <i>stable</i> v1 reward with the row weight raised (0.5→0.8) and the (previously inert, then dangerous) turn-cost removed — applied on top of a much stronger base policy. It keeps everything that was safe, fixes what was under-powered (coverage), and deletes the exact term that caused the collapse.</p>
+</div>
+
+<!-- ===================== -->
+<h2>5. Planned config &amp; expectation</h2>
+<div class="panel">
+<ul>
+<li>Init <code>actor_init_v3</code>; reward v3 (above); G=8; lr 1e-6; KL 0.005; <code>max_actor_ckpt_to_keep</code> high + save every step; separate ckpt dir (preserve v3 + step_30).</li>
+<li>Parquet already uses the enumerate-then-loop prompt; larger val for selection; report EN+ZH test only.</li>
+<li><b>Expectation:</b> a modest, <i>stable</i> lift over SFT-v3 by reinforcing its high-coverage samples (pass@k→pass@1), without the efficiency-driven collapse. On EN, the old step_30 showed GRPO-on-good-SFT can add ~+0.03 f1_item — so v3+GRPO is plausibly the best model overall.</li>
+</ul>
+<p class="note">Artifacts: reward <code>post_training/grpo/widesearch_reward.py</code> (set W_ROW=0.8, W_OUT=0.1, W_COST=0; via <code>GRPO_W_*</code> env), run script to be added as <code>run_grpo_v3.sh</code>.</p>
+</div>
+
+<!-- ===================== -->
+<h2>6. Q&amp;A — concepts behind the design</h2>
+<div class="sub">Notes captured while reasoning through the design (AI-engineer view).</div>
+
+<div class="panel">
+<h3>Q: What does "inert" mean for the v1 turn_cost term?</h3>
+<p><b>Inert = present in the formula but always evaluated to zero, so it never affected the reward.</b> v1 had <code>− 0.1·turn_cost</code> with <code>turn_cost = min(n_turns/20, 1)</code>, but <code>n_turns</code> was never plumbed through from verl → it was always <code>0</code>:</p>
+<pre>turn_cost = min(0/20, 1) = 0   →   −0.1 × 0 = 0   (contributes nothing)</pre>
+<p>The code <i>looked</i> like it rewarded efficiency, but that branch was dead. So v1's −48% turn reduction was <b>emergent</b> (a side-effect of chasing outcome reward), <b>not</b> driven by the penalty. Contrast: v2 <b>activated</b> it (<code>n_turns = count("&lt;tool_call&gt;")</code>, budget 12) → the penalty became real → drove the "stop early → no table" collapse. v3 <b>removes</b> it entirely.</p>
+</div>
+
+<div class="panel">
+<h3>Q: What is post-training, and what's its goal?</h3>
+<p>Pre-training gives a general next-token predictor (knows language + facts). <b>Post-training reshapes that general model toward a specific behavior/objective — it redistributes probability mass toward wanted behaviors, not new facts.</b> Here the objective is a <b>behavioral/policy</b> goal:</p>
+<p class="key">Make Qwen2.5-7B adopt the <b>code-act batched-search pattern</b> (enumerate all sub-queries, then loop/batch in one code block) instead of firing tool calls one at a time — saving turns/cost while keeping coverage decent. <b>F1 is a guardrail, not the primary target.</b></p>
+<table>
+<tr><th>Method</th><th>What it does</th><th>Role</th></tr>
+<tr><td>SFT (v2→v3)</td><td>Imitation — copy the distribution of good traces; moves the whole policy toward the pattern.</td><td>Plants the behavior in the distribution.</td></tr>
+<tr><td>GRPO (RL)</td><td>Reinforcement — generate, score outcomes, push up what scored well; sharpens among behaviors already producible.</td><td>Amplifies the good samples already in the distribution.</td></tr>
+</table>
+<p><b>Key model: SFT plants the behavior; RL amplifies it.</b> That's why RL-first collapsed (nothing good to amplify) and why SFT-v3 → GRPO is the right order.</p>
+</div>
+
+<div class="panel">
+<h3>Q: For GRPO, is the reward function the critical thing?</h3>
+<p><b>Yes — the reward <i>defines</i> the objective. RL optimizes what you measure, not what you want.</b> GRPO mechanics per prompt:</p>
+<pre>1. Sample a group of G rollouts.
+2. Score each with reward R_i.
+3. Group-relative advantage (z-score in group):  A_i = (R_i − mean(R)) / std(R)
+4. Push prob up for above-average, down for below-average, with a KL leash.</pre>
+<p>Two consequences that define the whole design:</p>
+<ul>
+<li><b>If every rollout in a group scores the same → std→0 → advantage→0 → gradient→0.</b> This is the v2 collapse: once all rollouts degenerated to "one search, no table," they scored ~equally → no signal to climb out. The reward created an <b>absorbing state</b>.</li>
+<li><b>The model exploits what the reward literally says, not what you meant.</b> Turn-cost literally said "fewer turns = more reward" → model found "1 turn, no table" satisfies it. That's reward hacking / specification gaming.</li>
+</ul>
+</div>
+
+<div class="panel">
+<h3>Q: Basic strategy to design/optimize the reward?</h3>
+<table>
+<tr><th>Rule</th><th>Where it shows up</th></tr>
+<tr><td><b>a) Reward the outcome you want, not a proxy.</b></td><td>Load-bearing terms are <code>f1_item</code>, <code>f1_row</code>; everything else is a small corrective.</td></tr>
+<tr><td><b>b) Never let a shaping term fight the primary objective.</b></td><td>Turn-cost penalized the very act (turns) required to finish → deleted in v3.</td></tr>
+<tr><td><b>c) Prefer emergent over forced behavior.</b></td><td>v1's efficiency emerged free from outcome reward; forcing it (v2) broke things.</td></tr>
+<tr><td><b>d) Keep terms sparse &amp; interpretable.</b></td><td>Every extra term is another hacking surface; reward ≈ <code>outcome − small anti-fab penalty</code>.</td></tr>
+<tr><td><b>e) Guarantee ordering: finishing must dominate not-finishing.</b></td><td>Real positive <code>has_table</code> + optional hard floor removes the absorbing state.</td></tr>
+<tr><td><b>f) Constrain drift with KL + the right reference.</b></td><td>KL 0.005 to SFT-v3; the reference policy is part of the reward design.</td></tr>
+<tr><td><b>g) Instrument for collapse; checkpoint on val, not recency.</b></td><td>Watch entropy/length/has_table; best-by-val (v2's keep-last-2 deleted its only good ckpt).</td></tr>
+</table>
+<p class="key"><b>One-sentence version:</b> In GRPO the reward <i>is</i> the objective; the game is designing a reward whose only high-scoring behaviors are the ones you actually want — no degenerate shortcuts, no shaping term competing with the goal — then using KL + a strong reference + val-based checkpointing to keep RL inside that good region while it sharpens what SFT already learned.</p>
+</div>
+
+<div class="panel">
+<h3>Q: Do we need to increase <code>has_table</code> (0.1) to guarantee the ordering?</h3>
+<p><b>No — and inflating it is the wrong fix.</b> Under v3 (<code>R = 1.0·f1_item + 0.8·f1_row + 0.1·has_table − 0.1·constant_fill</code>):</p>
+<table>
+<tr><th>Rollout</th><th>f1_item</th><th>f1_row</th><th>has_table</th><th>constant_fill</th><th>R</th></tr>
+<tr><td>Give up (no table)</td><td class="num">0</td><td class="num">0</td><td class="num">0</td><td class="num">0</td><td class="num">0</td></tr>
+<tr><td>Real table, totally wrong</td><td class="num">0</td><td class="num">0</td><td class="num">1</td><td class="num">0</td><td class="num good">+0.1</td></tr>
+<tr><td>Real table, partial</td><td class="num">0.3</td><td class="num">0.2</td><td class="num">1</td><td class="num">0</td><td class="num good">+0.56</td></tr>
+</table>
+<p>A genuine table always beats giving up by ≥ +0.1. The magnitude only needs to be <b>strictly positive</b>, which it is. The v2 collapse was <b>not</b> caused by a small <code>has_table</code> — it was the turn-cost paying the model to stop (finishing carried a <i>bigger</i> penalty than stopping). Remove turn-cost and the ordering holds regardless.</p>
+<p><b>Why not inflate it:</b> a large <code>has_table</code> (0.3–0.5) becomes a farmable proxy — the model emits empty/garbage tables to grab reward. You'd trade "stop early" for "spam junk tables."</p>
+<p><b>Structural guarantee (belt-and-suspenders):</b> instead of inflating the soft term, add a <b>hard floor</b> on no-table — cleaner and non-hackable:</p>
+<pre>if not has_table:      # produced nothing scoreable
+    return -0.1        # giving up is always strictly worst</pre>
+<p><b>Nuance:</b> neither the soft term nor the floor rescues you <i>once fully collapsed</i> (all no-table → std=0 → zero gradient). What keeps you out of that basin is <b>starting from SFT-v3</b>, where most rollouts already finish, so the group has variance in the right direction. Reward shaping points the gradient the right way; the good init keeps you out of the flat region.</p>
+</div>
+
+</div>
+</body>
+</html>

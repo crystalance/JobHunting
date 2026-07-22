@@ -161,3 +161,73 @@ So the trade-off answer: don't full-FT on 48 examples. Keep the LoRA cold-start,
 But — gate this on the val numbers first. Let me run the held-out set now so we decide on evidence, not a single instance.
 
 Let me launch the val-set evaluation on the LoRA model (held-out ws_en_071–085, skipping 079 which was distilled in the pilot).
+
+## Training details
+1. in grpo, what does this step mean? i need all training details related
+---
+Read [](file:///home/dkidna/WebSearchResearch/post_training/grpo/run_grpo_v3.sh#40-40), lines 40 to 88
+
+You're looking at the handover, and "this step" = **one GRPO training step** (the `step:1 … step:21` in the logs, the `1/21` in the progress bar). Here's exactly what one step is and all the training details behind it.
+
+## What "1 step" means
+
+**One step = one full policy-gradient update built from a fresh batch of self-play episodes.** With our config, each step is:
+
+$$\underbrace{8 \text{ prompts}}_{\text{train\_batch\_size}} \times \underbrace{8 \text{ rollouts each}}_{\text{rollout.n (the GRPO group)}} = \mathbf{64 \text{ rollouts / step}}$$
+
+The run is **21 steps total** (`total_training_steps=21`). `total_epochs=100` is just a high cap so the step count is the real stopper. With 70 train prompts and 8 prompts/step, one pass over the data (an "epoch") ≈ 9 steps, so 21 steps ≈ 2.3 epochs (matches the log: `training/epoch:2` at step 21).
+
+## Anatomy of one step (the 4 phases you see in the timing logs)
+
+| Phase | What happens | log key (per-step time) |
+|---|---|---|
+| **1. Rollout / generation** | For each of the 8 prompts, sglang generates 8 full **multi-turn agent episodes** — the model reasons, emits `execute_python` tool calls, real Bing/gpt-4.1-mini search runs, kernel returns output, repeat until it writes the final table or hits a limit. | `timing_s/gen` (~340s, the bulk) |
+| **2. Reward scoring** | Each of the 64 finished episodes is scored by `widesearch_reward.compute_score` (WideSearch gpt-4.1 judge → f1_item/f1_row/has_table, minus fabrication, or the −0.10 no-table floor). | `timing_s/reward` |
+| **3. Advantage (GRPO)** | Within each 8-rollout group, compute the group-relative advantage $A_i=\frac{R_i-\text{mean}(R)}{\text{std}(R)}$. No critic network (that's the "G" in GRPO). | `timing_s/adv` |
+| **4. Actor update** | PPO-style gradient update on the LoRA/actor params, with a KL penalty pulling toward the frozen reference (SFT-v3) policy. | `timing_s/update_actor` (~152s) |
+
+Total ≈ **535 s/step** (`timing_s/step`), plus `timing_s/testing` (~250–300s) on the steps that validate.
+
+Inside phase 4: the 64 samples are split into minibatches of `ppo_mini_batch_size=8` → **8 gradient updates per step**, each with `ppo_micro_batch_size_per_gpu=1` (so gradient accumulation of 8 micro-batches across the 4 GPUs).
+
+## All the training hyperparameters (from run_grpo_v3.sh)
+
+**Algorithm**
+- `adv_estimator=grpo` — group-relative advantage, no value/critic model.
+- `kl_ctrl.kl_coef=0.005` — KL penalty weight vs the reference policy (anchors to SFT-v3; between v1's 0.001 and the over-tight v2's 0.01).
+- **Reward** = widesearch_reward.py (`compute_score`): `1.0·f1_item + 0.8·f1_row + 0.1·has_table − 0.1·constant_fill`, **no turn-cost**, hard `−0.10` floor when no table.
+
+**Data / sizes**
+- `train_batch_size=8` (prompts/step), `rollout.n=8` (group size) → 64 rollouts/step.
+- `ppo_mini_batch_size=8` → 8 grad updates/step; `ppo_micro_batch_size_per_gpu=1`.
+- `max_prompt_length=3072`, `max_response_length=20480` (tokens; long because episodes are multi-turn).
+- `optim.lr=1e-6` (low, typical for RL fine-tuning).
+
+**Rollout engine**
+- `rollout.name=sglang`, `mode=async`, `tensor_model_parallel_size=1`, `gpu_memory_utilization=0.55`.
+- **Multi-turn agent:** `multi_turn.enable=true`, `format=hermes`, `max_assistant_turns=25`, `max_tool_response_length=8192`, tools from `tools.yaml`, agent loop from `agent_loop_config.yaml` (the persistent-kernel `widesearch_tool_agent`).
+
+**System / distribution**
+- `strategy=fsdp2` for both actor and reference, `n_gpus_per_node=4`, `nnodes=1`.
+- Init policy: `actor_init_v3` (the SFT-v3 merged model).
+
+**Checkpointing / schedule**
+- `total_training_steps=21`, `save_freq=3`, `test_freq=3` (save + validate every 3 steps: 3,6,9,…,21).
+- `max_actor_ckpt_to_keep=2` (only last 2 FSDP checkpoints on disk; each ~86 GB with optimizer).
+- `default_local_dir=checkpoints/train_v3`; rollouts dumped to `rollout_dumps_v3/{train,val}`.
+
+## What each step reports (the metrics you saw)
+
+Per step the log prints, e.g. at step 21:
+- `actor/entropy:0.545` — policy randomness (healthy; ~0 would mean collapse).
+- `actor/pg_loss`, `actor/ppo_kl:~0`, `actor/grad_norm:0.60` — update health.
+- `critic/score` / `critic/rewards` mean/max/**min** — the reward distribution; **min = −0.10 means the no-table floor fired**.
+- `critic/advantages` min/max — spread ≠ 0 → there's a learning signal (the thing v2 lost when it collapsed).
+- `response_length/mean:~12.7k`, `num_turns/mean:~15` — behavior stability (halving length = collapse warning).
+- On validate steps: `val-core/widesearch/reward/mean@1`, `f1_item`, `f1_row`, `has_table`, `n_turns` (the greedy val curve — noisy, trend-only).
+
+## How a step maps to the outcome
+Across the 21 steps the policy did an "unlearn-then-relearn": dipped steps 3–9, recovered from step 12, and by step 21 had higher coverage + completion than the SFT-v3 start — without collapse, because we removed the turn-cost and anchored with KL 0.005. Full curve is in 7_21_2026/grpo_v3_training_result.html.
+
+Want me to add this "anatomy of a GRPO step" section into the handover doc (or the reward-design doc) so it's captured for the next person?
+---

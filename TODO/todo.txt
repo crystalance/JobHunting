@@ -13,6 +13,8 @@
     4. engine --> KV cache --> figure out
     5. SFT
     6. GRPO 
+    7. prefill
+    8. MOE
 
 3. leetcode
     1. 

@@ -2,7 +2,7 @@
 
 > Section: **Data Structure** — consolidated topic covering Binary Tree, Binary Search Tree, and Red-Black Tree.
 >
-> 结构：1. DFS 递归建模模板 → 2. 高频 DFS 题对比 → 3. 遍历的迭代实现 → 4. 例题 → 5. BST → 6. 红黑树 → 7. 树的直径
+> 结构：1. DFS 递归建模模板 → 2. 高频 DFS 题对比 → 3. 遍历的迭代实现 → 4. 例题 → 5. BST → 6. 红黑树 → 7. 树的直径/高度 → 8. 设计题 getRandomNode
 
 ## 1. Binary Tree — DFS 递归建模模板
 
@@ -255,7 +255,7 @@ public List<Integer> postorderTraversal(TreeNode root) {
        *     }
        * }
        */
-
+      
       class Solution {
           int preorderIndex = 0;
           int[] self_preorder;
@@ -267,7 +267,7 @@ public List<Integer> postorderTraversal(TreeNode root) {
               }
               return constructTree(0,inorder.length-1);
           }
-
+      
           private TreeNode constructTree(int left_border, int right_border){// border of inorder array
               if (left_border > right_border) {
                   return null;
@@ -302,13 +302,13 @@ public List<Integer> postorderTraversal(TreeNode root) {
        public Node left;
        public Node right;
        public Node next;
-
+   
        public Node() {}
-
+   
        public Node(int _val) {
            val = _val;
        }
-
+   
        public Node(int _val, Node _left, Node _right, Node _next) {
            val = _val;
            left = _left;
@@ -317,7 +317,7 @@ public List<Integer> postorderTraversal(TreeNode root) {
        }
    };
    */
-
+   
    class Solution {
        public Node connect(Node root) {
            if(root==null){return null;}
@@ -435,11 +435,11 @@ def dfs(node, low, high):
       BFS from any node
           ↓
       farthest node A
-
+   
       BFS from A
           ↓
       farthest node B
-
+   
       dist(A,B)
       =
       diameter
@@ -448,3 +448,120 @@ def dfs(node, low, high):
 3. 利用树型DP求直径，针对图结构而言，不用记录visited数组，直接在参数里维护father节点就行
 
    1. https://leetcode.cn/problems/difference-between-maximum-and-minimum-price-sum/solutions/2062782/by-endlesscheng-5l70/
+
+## 7. Tree's Height
+
+1. https://leetcode.com/problems/find-leaves-of-binary-tree/description/
+   1. height(root)=1+max(height(root.left), height(root.right)), dfs
+
+## 8. 设计题：树结构设计 getRandomNode / createNode（follow up: getRandomLeafNode / remove）
+
+> 面试设计题（Google 风格，类似 CTCI 4.11 Random Node）。核心考点：**如何让每个节点被等概率返回**，以及数据结构增删时如何维护这个能力。
+
+### 8.1 题目描述
+
+设计一棵树，支持以下操作：
+
+1. `createNode(parentVal, val)` — 在指定父节点下插入新节点
+2. `getRandomNode()` — **等概率**返回树中任意一个节点
+3. Follow up 1: `getRandomLeafNode()` — 等概率返回任意一个**叶子**节点
+4. Follow up 2: `remove(val)` — 删除节点，且上述随机操作仍然正确
+
+### 8.2 思路一：ArrayList + HashMap（O(1) random，工程首选）
+
+1. 核心：树本身照常建，但**额外维护一个节点列表** `List<Node>` + `Map<val, index>`。
+   1. `getRandomNode()` = 列表里随机挑一个下标 → **O(1)**
+   2. `createNode` = 正常挂到父节点 + append 到列表 → O(1)
+   3. `remove` = 经典 **swap-remove**（同 [380. Insert Delete GetRandom O(1)](https://leetcode.cn/problems/insert-delete-getrandom-o1/)）：把要删的元素和列表末尾交换，再删末尾，更新 map → O(1)
+
+2. ```java
+   class RandomTree {
+       static class Node {
+           int val;
+           List<Node> children = new ArrayList<>();
+           Node parent;                 // remove 时需要从父节点摘除
+           Node(int v) { val = v; }
+       }
+
+       private final Map<Integer, Node> nodes = new HashMap<>();   // val -> node
+       private final List<Node> pool = new ArrayList<>();          // 随机池
+       private final Map<Integer, Integer> idx = new HashMap<>();  // val -> pool index
+       private final Random rand = new Random();
+
+       public void createNode(int parentVal, int val) {
+           Node p = nodes.get(parentVal);         // 假设 parent 存在、val 不重复
+           Node cur = new Node(val);
+           cur.parent = p;
+           if (p != null) p.children.add(cur);
+           nodes.put(val, cur);
+           idx.put(val, pool.size());
+           pool.add(cur);
+       }
+
+       public Node getRandomNode() {
+           return pool.get(rand.nextInt(pool.size()));
+       }
+
+       // remove 语义（面试要先和面试官确认！）：这里删除叶子节点
+       public void remove(int val) {
+           Node cur = nodes.get(val);
+           if (cur == null || !cur.children.isEmpty()) return; // 只删叶子
+           if (cur.parent != null) cur.parent.children.remove(cur);
+           nodes.remove(val);
+           // swap-remove from pool
+           int i = idx.get(val), last = pool.size() - 1;
+           Node tail = pool.get(last);
+           pool.set(i, tail);
+           idx.put(tail.val, i);
+           pool.remove(last);
+           idx.remove(val);
+       }
+   }
+   ```
+
+3. **getRandomLeafNode 的做法**：再维护一个**只装叶子的池子**（同样 list + map + swap-remove）。
+   1. 关键在于维护时机：`createNode(p, v)` 时，新节点 `v` 入叶子池；若父节点 `p` 原来是叶子（这是它的第一个孩子），把 `p` 从叶子池移出。
+   2. `remove(v)`（删叶子）时：`v` 出叶子池；若父节点因此变回叶子（没有其他孩子了），父节点入叶子池。
+   3. 所有操作仍是 O(1)。
+
+### 8.3 思路二：子树 size 增强（不用额外空间，经典 CTCI 解法）
+
+1. 核心：每个节点维护 `size` = 子树节点总数。`getRandomNode` 先取 `r = rand(0, root.size)`，然后从根往下走：
+   1. `r < leftSize` → 进左子树
+   2. `r == leftSize` → 返回当前节点（当前节点自己占一个名额）
+   3. 否则 `r -= leftSize + 1`，进右子树
+2. 每个节点被选中的概率都是 `1/n`（每一层的名额分配严格按子树大小），复杂度 **O(h)**。
+
+   ```java
+   public Node getRandomNode() {
+       int r = rand.nextInt(root.size);
+       Node cur = root;
+       while (true) {
+           int leftSize = cur.left == null ? 0 : cur.left.size;
+           if (r < leftSize) { cur = cur.left; }
+           else if (r == leftSize) { return cur; }
+           else { r -= leftSize + 1; cur = cur.right; }
+       }
+   }
+   ```
+
+3. **维护**：`createNode` / `remove` 沿插入（删除）路径把途经节点的 `size` +1 / −1，O(h)。
+4. **getRandomLeafNode**：同理再维护一个 `leafCount`（子树叶子数），向下走时按左右子树的 `leafCount` 比例分配名额，当前节点是叶子时返回自己。
+5. 两种思路对比：
+
+   | | ArrayList + HashMap | size 增强 |
+   | --- | --- | --- |
+   | getRandomNode | O(1) | O(h) |
+   | createNode / remove | O(1) | O(h)（沿路径更新） |
+   | 额外空间 | O(n) 的池子和 map | 每个节点两个 int |
+   | 适用 | 一般树、工程实现 | BST/面试经典、无需额外容器 |
+
+### 8.4 面试要点
+
+1. **先问清语义**：`remove` 删的是叶子？还是任意节点（子树整体删除 or 孩子提升）？不同语义直接决定实现难度，主动确认是加分项。
+2. **等概率的证明要能说出口**：池子方案是显然的（均匀下标）；size 方案要能解释"每层按子树大小分名额，所以每个节点概率 1/n"。
+3. **不要用拒绝采样**（随机走到底、不是想要的就重来）——最坏情况无上界，面试官会追问。
+4. 相关题目：
+   1. [380. Insert Delete GetRandom O(1)](https://leetcode.cn/problems/insert-delete-getrandom-o1/) — swap-remove 的来源
+   2. [382. Linked List Random Node](https://leetcode.cn/problems/linked-list-random-node/) — 蓄水池抽样（数据流版等概率）
+   3. [497. Random Point in Non-overlapping Rectangles](https://leetcode.cn/problems/random-point-in-non-overlapping-rectangles/) — 按 size 加权选择的同款思想

@@ -435,11 +435,11 @@ def dfs(node, low, high):
       BFS from any node
           ↓
       farthest node A
-   
+      
       BFS from A
           ↓
       farthest node B
-   
+      
       dist(A,B)
       =
       diameter
@@ -482,12 +482,12 @@ def dfs(node, low, high):
            Node parent;                 // remove 时需要从父节点摘除
            Node(int v) { val = v; }
        }
-
+   
        private final Map<Integer, Node> nodes = new HashMap<>();   // val -> node
        private final List<Node> pool = new ArrayList<>();          // 随机池
        private final Map<Integer, Integer> idx = new HashMap<>();  // val -> pool index
        private final Random rand = new Random();
-
+   
        public void createNode(int parentVal, int val) {
            Node p = nodes.get(parentVal);         // 假设 parent 存在、val 不重复
            Node cur = new Node(val);
@@ -497,11 +497,11 @@ def dfs(node, low, high):
            idx.put(val, pool.size());
            pool.add(cur);
        }
-
+   
        public Node getRandomNode() {
            return pool.get(rand.nextInt(pool.size()));
        }
-
+   
        // remove 语义（面试要先和面试官确认！）：这里删除叶子节点
        public void remove(int val) {
            Node cur = nodes.get(val);

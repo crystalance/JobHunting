@@ -286,6 +286,61 @@
                     }
             ```
 
+#### dijkstra
+```java
+class Solution {
+    // 返回从起点 start 到每个点的最短路长度 dis，如果节点 x 不可达，则 dis[x] = Integer.MAX_VALUE
+    // 要求：没有负数边权
+    // 时间复杂度 O(n + mlogm)，注意堆中有 O(m) 个元素
+    private int[] shortestPathDijkstra(int n, int[][] edges, int start) {
+        // 注：如果节点编号从 1 开始（而不是从 0 开始），可以把 n 加一
+        List<int[]>[] g = new ArrayList[n]; // 邻接表
+        Arrays.setAll(g, _ -> new ArrayList<>());
+        for (int[] e : edges) {
+            int x = e[0];
+            int y = e[1];
+            int wt = e[2];
+            g[x].add(new int[]{y, wt});
+            // g[y].add(new int[]{x, wt}); // 无向图加上这行
+        }
+
+        int[] dis = new int[n]; // **如果数据范围大，改成 long[]**
+        Arrays.fill(dis, Integer.MAX_VALUE);
+        // 堆中保存 (起点到节点 x 的最短路长度，节点 x)
+        PriorityQueue<int[]> pq = new PriorityQueue<>(Comparator.comparingInt(a -> a[0]));
+        dis[start] = 0; // 起点到自己的距离是 0
+        pq.offer(new int[]{0, start});
+
+        while (!pq.isEmpty()) {
+            int[] top = pq.poll();
+            int disX = top[0];
+            int x = top[1];
+            if (disX > dis[x]) { // x 之前出堆过
+                continue;
+            }
+            for (int[] e : g[x]) {
+                int y = e[0];
+                int wt = e[1];
+                int newDisY = disX + wt;
+                if (newDisY < dis[y]) {
+                    dis[y] = newDisY; // 更新 x 的邻居的最短路
+                    // 懒更新堆：只插入数据，不更新堆中数据
+                    // 相同节点可能有多个不同的 newDisY，除了最小的 newDisY，其余值都会触发上面的 continue
+                    pq.offer(new int[]{newDisY, y});
+                }
+            }
+        }
+
+        return dis;
+    }
+}
+
+作者：灵茶山艾府
+链接：https://leetcode.cn/discuss/post/3581143/fen-xiang-gun-ti-dan-tu-lun-suan-fa-dfsb-qyux/
+来源：力扣（LeetCode）
+著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+```
+
 ##### Example Problem
 
 1. [207. Course Schedule](https://leetcode.cn/problems/course-schedule/)

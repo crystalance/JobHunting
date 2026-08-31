@@ -32,6 +32,8 @@ The JD literally says "establish evaluation standards for AI-assisted R&D". Own 
 
 ## C. Resume deep dive — post-training (SFT + GRPO)
 
+> Spoken 60–90s answers for all of C.1–C.4 + a bonus collapse/failure story: see `postTraining_spoken_answers.md` (verified against the postTraining docs and results).
+
 1. Why did SFT alone take F1 from 5% to 40%? What exactly did the model fail at before?
 2. What was your GRPO reward? How did you stop the model from reward-hacking (e.g., answering without searching)?
 3. Accuracy up, cost down 14%, latency down 9% simultaneously — why isn't that a contradiction? What behavior change caused it?

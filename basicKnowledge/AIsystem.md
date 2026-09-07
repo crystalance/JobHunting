@@ -124,3 +124,41 @@
 
 ### RAG
 1. 如何将RAG与Agent结合？当检索结果有噪声时，如何避免干扰Agent的推理与决策？
+
+### Long-horizon Agent
+> 来源：[Anthropic — Effective harnesses for long-running agents](https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents)（2025-11）
+
+1. **核心问题：跨 context window 的记忆断裂。** 长任务必然跨多个 session，每个新 session 对之前发生的事零记忆——像工程师轮班但完全不交接。compaction（自动压缩上下文）不够用：压缩传给下一个 session 的指令经常不清晰。所以解法不是"更大的窗口"，而是**把记忆外化到环境里**（文件系统 + git），让每个新 session 能低成本重建状态。
+
+2. **两大失败模式（面试可直接引用）：**
+    1. **贪多**：agent 试图一口气做完（one-shot），context 中途耗尽，留下"做了一半、没有文档"的烂摊子，下一个 session 要先花大量时间猜发生了什么、修基本功能。
+    2. **提前宣布完成**：后来的 session 看到"已经有进展了"，就直接宣布整个项目做完了。——这和我在 WideSearch 上观察到的单 agent "early convergence"（自己觉得做完了、其实还缺 3-8 行）是同一个失败模式，跨任务域普遍存在。
+
+3. **解法：initializer agent + coding agent 双阶段 harness。**
+    1. **Initializer（只跑第一次）**：搭建环境作为外部记忆——`init.sh`（一键启动开发服务器）、`claude-progress.txt`（进度日志）、**feature_list.json**（把高层需求展开成 200+ 条端到端的 feature，全部初始标记 `passes: false`）、初始 git commit。
+    2. **Coding agent（之后每个 session）**：每次只做**一个 feature**，做完留下"干净状态"——能 merge 到 main 的标准：没有大 bug、有文档、git commit 写清楚、更新 progress 文件。
+    3. 细节巧思：feature 清单用 **JSON 而不是 Markdown**——模型更不容易乱改 JSON；再配上强硬指令"不许删除或修改测试项"。agent 只允许把 `passes` 从 false 改 true。
+
+4. **防"假完成"：强制端到端自验证。** 模型倾向于改完代码就标记完成，最多跑跑单测。必须显式要求它**像人类用户一样用浏览器自动化做端到端测试**，验证通过才能把 feature 标为 passing。给了测试工具后性能显著提升——agent 能发现代码层面看不出来的 bug。（已知盲区：浏览器原生 alert 弹窗这类工具看不到的 UI。）
+
+5. **Session 开工仪式（getting up to speed）：** 每个新 session 固定流程——`pwd` → 读 git log + progress 文件 → 读 feature 清单选一个最高优先级未完成项 → 跑 `init.sh` 起服务 → 先做一轮基础冒烟测试确认没有遗留 bug，**再**开始新 feature。如果环境是坏的，先修再做新的，否则只会越做越烂。
+
+6. **和我自己项目的对应（面试加分点）：**
+    1. feature_list.json ≈ 我 HDMAS 的 **blackboard task_log**——都是"把计划外化成共享结构化状态，靠结构而不是靠注意力记住全局目标"；
+    2. "只许改 passes 字段" ≈ 我的 append-only + 只能改自己 entry 的黑板协议——都是用**协议约束**替代"希望 LLM 自觉"；
+    3. 防提前收敛的 checklist（终止前重新枚举所有子任务逐条对照）≈ 它的 feature 清单全部 pass 才算完成；
+    4. "先冒烟测试再做新功能" ≈ 我 CI/CD 的 health-check 思路：先证明基线是好的，再叠加变更。
+
+7. **开放问题：** 单个通用 coding agent vs 多 agent 分工（testing agent / QA agent / cleanup agent）哪个更好，Anthropic 自己也说还没定论——可以自然接到我的 HDMAS 对称多 agent 经验聊 trade-off。
+
+    **口语版一句话总结：**
+    "长任务 agent 的核心不是更大的上下文，而是把记忆外化成环境里的结构化 artifact——feature 清单、进度文件、git 历史——然后用协议逼 agent 增量工作：每次开工先重建状态、先验证基线，每次只做一件事，做完留下干净可交接的状态，完成必须靠端到端验证而不是自我感觉。本质上是把'好工程师的工作习惯'编码进 harness。"
+
+    **English spoken version (~90s):**
+    "The core challenge with long-horizon agents is that any long task has to span multiple context windows, and every new session starts with zero memory of what happened before — it's like engineers working in shifts with no handover. Context compaction alone doesn't solve this. Anthropic's recent post on long-running harnesses points out that the real fix is to **externalize memory into the environment** — the file system and git — so each new session can cheaply rebuild its state.
+
+    They found two dominant failure modes. First, the agent tries to one-shot the whole project, runs out of context halfway through, and leaves a half-built, undocumented mess for the next session. Second — and this one I've seen myself — a later session looks around, sees some progress, and **declares the whole project done prematurely**. That's exactly the early-convergence failure I measured on WideSearch, where a single agent would stop with three to eight rows still missing.
+
+    Their solution has two parts. An **initializer agent** runs once and sets up the environment as external memory: an init script, a progress log, and a feature list in JSON — every feature marked as failing initially. Then a **coding agent** runs each session with a strict protocol: read the git log and progress file, run a smoke test to verify the baseline is healthy, pick exactly one unfinished feature, implement it, verify it **end-to-end like a human user would** — not just unit tests — and only then flip it to passing, commit, and update the progress log. A nice detail: they use JSON instead of Markdown for the feature list because models are less likely to tamper with JSON, and the agent is only allowed to change the `passes` field.
+
+    What I like about this is it matches what I built in HDMAS: my blackboard task log is the same idea as their feature list — externalize the plan into shared structured state, and rely on **protocol constraints instead of hoping the LLM behaves**. The takeaway in one line: long-horizon capability doesn't come from bigger context windows; it comes from encoding good engineering habits — incremental work, clean handoffs, verify before you claim done — into the harness itself."

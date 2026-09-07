@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BrowserUseBot — System Architecture</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#EDF0F2;
+    --grid:#DFE5EA;
+    --grid2:#CFD8DF;
+    --ink:#1F2D3A;
+    --ink-soft:#5A6B7A;
+    --card:#FFFFFF;
+    --accent:#E8611C;       /* human-in-the-loop */
+    --teal:#1F7A6E;         /* observability */
+    --steel:#5B7A99;        /* CI/CD */
+    --aws-tint:#F6F9FB;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Archivo',system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .mono{font-family:'IBM Plex Mono',ui-monospace,monospace}
+
+  /* ---------- page header ---------- */
+  header{max-width:1400px;margin:0 auto;padding:44px 20px 8px}
+  .eyebrow{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.22em;
+    text-transform:uppercase;color:var(--accent);font-weight:600}
+  header h1{font-size:34px;font-weight:800;letter-spacing:-.01em;margin:6px 0 8px}
+  header p{max-width:860px;font-size:14px;line-height:1.55;color:var(--ink-soft)}
+
+  /* ---------- drawing board ---------- */
+  .board-scroll{overflow-x:auto;padding:0 20px}
+  .board{
+    position:relative;width:1400px;height:1500px;margin:22px auto 0;
+    background:
+      repeating-linear-gradient(0deg,transparent 0 31px,var(--grid) 31px 32px),
+      repeating-linear-gradient(90deg,transparent 0 31px,var(--grid) 31px 32px),
+      repeating-linear-gradient(0deg,transparent 0 159px,var(--grid2) 159px 160px),
+      repeating-linear-gradient(90deg,transparent 0 159px,var(--grid2) 159px 160px),
+      #F3F5F7;
+    border:2px solid var(--ink);
+  }
+  svg.wires{position:absolute;inset:0;width:1400px;height:1500px;pointer-events:none;z-index:3}
+
+  /* ---------- nodes ---------- */
+  .node{
+    position:absolute;background:var(--card);border:1.5px solid var(--ink);
+    border-radius:3px;padding:10px 12px;z-index:2;
+    box-shadow:3px 3px 0 rgba(31,45,58,.10);
+  }
+  .node h4{font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:600;
+    letter-spacing:.09em;text-transform:uppercase;margin-bottom:5px}
+  .node p{font-size:11.5px;line-height:1.42;color:var(--ink-soft)}
+  .node p b{color:var(--ink);font-weight:600}
+  .node.accent-edge{border-color:var(--accent);box-shadow:3px 3px 0 rgba(232,97,28,.16)}
+  .node.accent-edge h4{color:var(--accent)}
+  .chip{padding:7px 9px}
+  .chip h4{margin-bottom:2px;font-size:9.5px}
+  .chip p{font-size:10px;line-height:1.3}
+  .strip{display:flex;align-items:center;padding:0 12px}
+  .strip p{font-size:10.5px;color:var(--ink-soft)}
+
+  /* ---------- zones ---------- */
+  .zone{position:absolute;border:1.5px dashed rgba(31,45,58,.45);border-radius:4px;z-index:1}
+  .zone>.zlabel{
+    position:absolute;top:-9px;left:12px;background:#F3F5F7;padding:0 7px;
+    font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:600;
+    letter-spacing:.14em;text-transform:uppercase;color:var(--ink)}
+  .zone.solid{border-style:solid;border-width:2px;background:var(--aws-tint)}
+  .zone.solid>.zlabel{background:var(--aws-tint);font-size:11.5px}
+  .zone.inner{border-color:rgba(31,45,58,.3)}
+  .zone.inner>.zlabel{background:var(--aws-tint);color:var(--ink-soft)}
+
+  /* ---------- wire labels / badges ---------- */
+  .wl{position:absolute;z-index:4;font-family:'IBM Plex Mono',monospace;font-size:9px;
+    font-weight:500;letter-spacing:.04em;color:var(--ink-soft);background:#F3F5F7;
+    padding:1px 4px;border-radius:2px;white-space:nowrap}
+  .wl.accent{color:var(--accent);font-weight:600}
+  .wl.steel{color:var(--steel)}
+  .wl.teal{color:var(--teal)}
+  .wl.multi{white-space:normal;line-height:1.45;background:transparent}
+  .badge{
+    position:absolute;z-index:5;width:19px;height:19px;border-radius:50%;
+    background:var(--accent);color:#fff;font-family:'IBM Plex Mono',monospace;
+    font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;
+    box-shadow:0 0 0 3px rgba(232,97,28,.18)}
+
+  /* ---------- legend ---------- */
+  .legend{position:absolute;left:1130px;top:56px;width:240px;z-index:2;
+    background:var(--card);border:1.5px solid var(--ink);border-radius:3px;padding:10px 12px;
+    box-shadow:3px 3px 0 rgba(31,45,58,.10)}
+  .legend h4{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.12em;
+    text-transform:uppercase;margin-bottom:8px}
+  .legend .row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+  .legend .row:last-child{margin-bottom:0}
+  .legend .sw{width:26px;height:0;border-top:2.5px solid var(--ink);flex:none}
+  .legend .sw.accent{border-color:var(--accent)}
+  .legend .sw.teal{border-color:var(--teal);border-top-style:dashed}
+  .legend .sw.steel{border-color:var(--steel);border-top-style:dashed}
+  .legend span{font-size:11px;color:var(--ink-soft)}
+
+  /* ---------- title block (drafting sheet corner) ---------- */
+  .titleblock{
+    position:absolute;left:1040px;top:1352px;width:330px;z-index:2;
+    background:var(--card);border:1.5px solid var(--ink)}
+  .titleblock .tb-row{display:flex;border-bottom:1px solid rgba(31,45,58,.25)}
+  .titleblock .tb-row:last-child{border-bottom:none}
+  .titleblock .tb-k{width:88px;flex:none;padding:5px 8px;font-family:'IBM Plex Mono',monospace;
+    font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);
+    border-right:1px solid rgba(31,45,58,.25)}
+  .titleblock .tb-v{padding:5px 8px;font-size:10.5px;font-weight:600}
+
+  /* ---------- annotations below ---------- */
+  .notes{max-width:1400px;margin:30px auto 0;padding:0 20px;
+    display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+  .note{background:var(--card);border:1.5px solid var(--ink);border-radius:3px;padding:16px;
+    box-shadow:3px 3px 0 rgba(31,45,58,.10)}
+  .note h3{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.1em;
+    text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+  .note h3 .sw{width:20px;height:0;border-top:2.5px solid var(--ink);flex:none}
+  .note.accent h3{color:var(--accent)} .note.accent h3 .sw{border-color:var(--accent)}
+  .note.teal h3{color:var(--teal)} .note.teal h3 .sw{border-color:var(--teal);border-top-style:dashed}
+  .note.steel h3{color:var(--steel)} .note.steel h3 .sw{border-color:var(--steel);border-top-style:dashed}
+  .note p,.note li{font-size:12px;line-height:1.55;color:var(--ink-soft)}
+  .note b{color:var(--ink);font-weight:600}
+  .note ol{padding-left:18px}
+  .note ol li{margin-bottom:6px}
+  .note ol li::marker{font-family:'IBM Plex Mono',monospace;font-weight:600;color:var(--accent)}
+  .note .kbd{font-family:'IBM Plex Mono',monospace;font-size:10.5px;background:var(--paper);
+    padding:1px 4px;border-radius:2px;color:var(--ink)}
+
+  /* ---------- facts strip ---------- */
+  .facts{max-width:1400px;margin:16px auto 60px;padding:0 20px}
+  .facts-inner{border:1.5px solid var(--ink);border-radius:3px;background:var(--card);
+    display:grid;grid-template-columns:repeat(6,1fr);box-shadow:3px 3px 0 rgba(31,45,58,.10)}
+  .fact{padding:12px 14px;border-right:1px solid rgba(31,45,58,.18)}
+  .fact:last-child{border-right:none}
+  .fact .k{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--ink-soft);margin-bottom:4px}
+  .fact .v{font-size:12px;font-weight:600;line-height:1.4}
+
+  @media (max-width:1100px){
+    .notes{grid-template-columns:repeat(2,1fr)}
+    .facts-inner{grid-template-columns:repeat(3,1fr)}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">System schematic · rev 0.2 · sheet A-01</div>
+  <h1>BrowserUseBot — Architecture</h1>
+  <p>A 24/7 supervised browser-agent: you drive it from Telegram, it runs browser and API
+     tasks on an always-on AWS host, and when a task hits a login wall it hands the live
+     browser back to you instead of evading it. Code ships from the local dev environment
+     through a GitHub Actions test-gated pipeline; every agent step is traced to Langfuse.</p>
+</header>
+
+<div class="board-scroll">
+<div class="board">
+
+  <!-- ================= LEGEND ================= -->
+  <div class="legend">
+    <h4>Wire legend</h4>
+    <div class="row"><span class="sw"></span><span>Task &amp; control flow</span></div>
+    <div class="row"><span class="sw accent"></span><span>Human-in-the-loop login handoff</span></div>
+    <div class="row"><span class="sw teal"></span><span>Observability (traces)</span></div>
+    <div class="row"><span class="sw steel"></span><span>CI/CD &amp; dev loop</span></div>
+  </div>
+
+  <!-- ================= USER + TELEGRAM ================= -->
+  <div class="node" style="left:30px;top:150px;width:250px;height:150px">
+    <h4>You · Human operator</h4>
+    <p>Phone with Telegram + a browser.<br>
+       Sends tasks, approves risky actions, and <b>performs every login yourself</b>
+       (QR scan · password · IME · 2FA). The agent never bypasses auth.</p>
+  </div>
+
+  <div class="node" style="left:340px;top:150px;width:240px;height:150px">
+    <h4>Telegram Bot API</h4>
+    <p>The control channel.<br>
+       <b>In:</b> <span class="mono">\new \jobs \status \done \approve \ingest</span><br>
+       <b>Out:</b> progress, results, daily digests, 🔐 login-handoff links.</p>
+  </div>
+
+  <!-- ================= AWS HOST ================= -->
+  <div class="zone solid" style="left:630px;top:40px;width:460px;height:1090px">
+    <span class="zlabel">AWS EC2 · Always-on host (24/7)</span>
+  </div>
+
+  <div class="node strip" style="left:650px;top:92px;width:420px;height:38px">
+    <p><b class="mono">systemd · browseruse.service</b> &nbsp;—&nbsp; Restart=always · entrypoint <span class="mono">scripts/run-aws.sh</span></p>
+  </div>
+
+  <div class="node" style="left:650px;top:150px;width:280px;height:64px">
+    <h4>Telegram Gateway</h4>
+    <p>Long-polls the Bot API · streams progress · delivers handoff links.</p>
+  </div>
+  <div class="node" style="left:950px;top:150px;width:120px;height:64px">
+    <h4>Scheduler</h4>
+    <p>Cron jobs, e.g. daily job sweep.</p>
+  </div>
+
+  <div class="node" style="left:650px;top:252px;width:200px;height:74px">
+    <h4>Intent Router (LLM)</h4>
+    <p>Reads the raw request, picks a capability + typed params.</p>
+  </div>
+  <div class="node" style="left:870px;top:252px;width:200px;height:74px">
+    <h4>Capability Registry</h4>
+    <p>Self-registered menu — adding = new module, no core edit.</p>
+  </div>
+
+  <!-- capability layer -->
+  <div class="zone inner" style="left:650px;top:368px;width:420px;height:150px">
+    <span class="zlabel">Capability layer · pluggable</span>
+  </div>
+  <div class="node" style="left:662px;top:402px;width:190px;height:102px">
+    <h4>GeneralBrowse</h4>
+    <p>Base agent + general tools, for one-off tasks and prompt skills.</p>
+  </div>
+  <div class="node" style="left:866px;top:402px;width:192px;height:102px">
+    <h4>BatchCrawl</h4>
+    <p>Long-horizon harvester: chunked agent loop + ledger.<br>
+       <b>Adapters:</b> 小红书 · more per-site glue.</p>
+  </div>
+
+  <!-- shared substrate -->
+  <div class="zone inner" style="left:650px;top:556px;width:420px;height:226px">
+    <span class="zlabel">Shared substrate</span>
+  </div>
+  <div class="node" style="left:662px;top:590px;width:396px;height:62px">
+    <h4>BrowserAgentRunner — wraps browser-use</h4>
+    <p>Reused engine: agent loop · tools registry · indexed DOM · CDP session.</p>
+  </div>
+  <div class="node chip" style="left:662px;top:664px;width:190px;height:44px">
+    <h4>General tools</h4>
+    <p class="mono">run_js · extract_and_save</p>
+  </div>
+  <div class="node chip" style="left:868px;top:664px;width:190px;height:44px">
+    <h4>Workspace + ledger</h4>
+    <p>dedup · resume · artifacts</p>
+  </div>
+  <div class="node chip accent-edge" style="left:662px;top:718px;width:190px;height:44px">
+    <h4>Login-handoff hook</h4>
+    <p>detect wall → pause / resume</p>
+  </div>
+  <div class="node chip" style="left:868px;top:718px;width:190px;height:44px">
+    <h4>Persistent profile</h4>
+    <p>cookies survive across tasks</p>
+  </div>
+
+  <!-- display + remote view -->
+  <div class="zone inner" style="left:650px;top:820px;width:420px;height:152px">
+    <span class="zlabel">Display + remote view</span>
+  </div>
+  <div class="node" style="left:662px;top:852px;width:396px;height:50px">
+    <h4>Headful Chromium — Xvfb :99 · fluxbox WM</h4>
+  </div>
+  <div class="node accent-edge" style="left:662px;top:912px;width:396px;height:48px">
+    <h4>x11vnc :5900 → websockify + noVNC :8770</h4>
+  </div>
+
+  <div class="wl multi" style="left:650px;top:1000px;width:420px;font-size:9.5px;color:var(--ink-soft)">
+    EC2 t3.small · Ubuntu 24.04 · deploy dir ~/buBot/BrowserUseBot<br>
+    security group: 22 ← dev/CI only &nbsp;·&nbsp; 8770 ← phone (login link)<br>
+    secrets live only in server .env (chmod 600, git-ignored)
+  </div>
+
+  <!-- ================= RIGHT COLUMN ================= -->
+  <div class="node" style="left:1130px;top:252px;width:240px;height:74px">
+    <h4>LLM API — OpenAI</h4>
+    <p><span class="mono">gpt-5.x</span> + vision · used by the router and every agent step.</p>
+  </div>
+
+  <div class="node" style="left:1130px;top:560px;width:240px;height:120px">
+    <h4>Langfuse — observability</h4>
+    <p>Per-step traces · run status · latency · token cost · dedup / extraction
+       accuracy metrics · scheduled evals, regressions alert back via Telegram.</p>
+  </div>
+
+  <div class="node" style="left:1130px;top:850px;width:240px;height:122px">
+    <h4>Target web</h4>
+    <p>小红书 · ATS APIs (Greenhouse / Lever / Ashby) · job boards.<br>
+       <b>API-first, browser-second</b> — no anti-bot evasion, ever.</p>
+  </div>
+
+  <!-- ================= BOTTOM: DEV + CI/CD ================= -->
+  <div class="node" style="left:30px;top:1260px;width:300px;height:200px">
+    <h4>Local dev environment</h4>
+    <p>Windows laptop · <span class="mono">uv</span> venv + lockfile ·
+       local <span class="mono">.env</span> holds a <b>dedicated dev bot token</b>
+       so the local poller never 409-collides with prod.<br><br>
+       Edit locally, push — <b>never develop on the server</b>.</p>
+  </div>
+
+  <div class="zone" style="left:400px;top:1260px;width:500px;height:200px">
+    <span class="zlabel">GitHub — repo + Actions CI/CD</span>
+  </div>
+  <div class="node chip" style="left:415px;top:1310px;width:140px;height:60px">
+    <h4>Repo</h4>
+    <p><span class="mono">main</span> + version tags for rollback</p>
+  </div>
+  <div class="node chip" style="left:570px;top:1310px;width:150px;height:60px">
+    <h4>Test job</h4>
+    <p><span class="mono">ubuntu-latest</span> — prod-like OS, import smoke test</p>
+  </div>
+  <div class="node chip" style="left:735px;top:1310px;width:150px;height:60px">
+    <h4>Deploy job</h4>
+    <p><span class="mono">needs: test</span> · appleboy/ssh-action</p>
+  </div>
+  <div class="node strip" style="left:415px;top:1385px;width:470px;height:40px">
+    <p class="mono" style="font-size:9.5px">secrets: EC2_HOST · EC2_USER · EC2_SSH_KEY (dedicated deploy keypair)</p>
+  </div>
+
+  <!-- ================= TITLE BLOCK ================= -->
+  <div class="titleblock">
+    <div class="tb-row"><div class="tb-k">Project</div><div class="tb-v">BrowserUseBot — supervised browser-agent platform</div></div>
+    <div class="tb-row"><div class="tb-k">Sheet</div><div class="tb-v">A-01 · System architecture</div></div>
+    <div class="tb-row"><div class="tb-k">Rev / date</div><div class="tb-v">v0.2 · 2026-09-06</div></div>
+    <div class="tb-row"><div class="tb-k">Sources</div><div class="tb-v mono" style="font-size:9px;font-weight:500">browser-agent-platform-design.md · computer-use-core-design.md · deployToAWS.md · CI_CD.md</div></div>
+  </div>
+
+  <!-- ================= WIRES ================= -->
+  <svg class="wires" viewBox="0 0 1400 1500">
+    <defs>
+      <marker id="m-ink" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#1F2D3A"/>
+      </marker>
+      <marker id="m-accent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#E8611C"/>
+      </marker>
+      <marker id="m-teal" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#1F7A6E"/>
+      </marker>
+      <marker id="m-steel" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#5B7A99"/>
+      </marker>
+    </defs>
+
+    <g stroke="#1F2D3A" stroke-width="2" fill="none">
+      <!-- chat + control -->
+      <path d="M280,190 H334" marker-end="url(#m-ink)"/>
+      <path d="M340,230 H286" marker-end="url(#m-ink)"/>
+      <path d="M580,182 H646" marker-end="url(#m-ink)"/>
+      <path d="M650,202 H586" marker-end="url(#m-ink)"/>
+      <!-- internal task flow -->
+      <path d="M790,214 V248" marker-end="url(#m-ink)"/>
+      <path d="M1010,214 V248" marker-end="url(#m-ink)"/>
+      <path d="M850,289 H866" marker-end="url(#m-ink)"/>
+      <path d="M970,326 V364" marker-end="url(#m-ink)"/>
+      <path d="M860,518 V552" marker-end="url(#m-ink)"/>
+      <path d="M860,782 V816" marker-end="url(#m-ink)"/>
+      <!-- LLM + web -->
+      <path d="M1070,612 H1105 V289 H1126" marker-end="url(#m-ink)"/>
+      <path d="M1070,878 H1126" marker-end="url(#m-ink)"/>
+    </g>
+
+    <!-- observability -->
+    <g stroke="#1F7A6E" stroke-width="2" fill="none" stroke-dasharray="6 4">
+      <path d="M1070,645 H1126" marker-end="url(#m-teal)"/>
+    </g>
+
+    <!-- human-in-the-loop -->
+    <g stroke="#E8611C" stroke-width="2.5" fill="none">
+      <path d="M662,740 H608 V225 H584" marker-end="url(#m-accent)"/>
+      <path d="M155,300 V938 H658" marker-end="url(#m-accent)"/>
+    </g>
+
+    <!-- CI/CD -->
+    <g stroke="#5B7A99" stroke-width="2" fill="none" stroke-dasharray="7 4">
+      <path d="M330,1345 H396" marker-end="url(#m-steel)"/>
+      <path d="M555,1340 H566" marker-end="url(#m-steel)"/>
+      <path d="M720,1340 H731" marker-end="url(#m-steel)"/>
+      <path d="M885,1340 H960 V1134" marker-end="url(#m-steel)"/>
+      <path d="M230,1260 V1200 H310 V270 H336" marker-end="url(#m-steel)"/>
+    </g>
+  </svg>
+
+  <!-- ================= WIRE LABELS ================= -->
+  <div class="wl" style="left:284px;top:176px">cmds</div>
+  <div class="wl" style="left:282px;top:234px">alerts</div>
+  <div class="wl" style="left:584px;top:168px">long-poll</div>
+  <div class="wl" style="left:790px;top:224px;transform:translateX(6px)">route</div>
+  <div class="wl" style="left:1018px;top:224px">trigger</div>
+  <div class="wl" style="left:1116px;top:370px;transform:rotate(90deg);transform-origin:left top">chat/completions</div>
+  <div class="wl teal" style="left:1076px;top:630px">traces</div>
+  <div class="wl" style="left:1063px;top:832px">CDP browsing</div>
+
+  <div class="wl accent" style="left:466px;top:306px">🔐 login link → chat</div>
+  <div class="wl multi accent" style="left:170px;top:872px;width:200px;font-size:9px">
+    opens noVNC on phone — logs in inside the agent's own browser
+    (QR · password · IME · 2FA); token-gated, single-use, torn down after /done</div>
+  <div class="wl accent" style="left:60px;top:620px">http://&lt;EC2-IP&gt;:8770/vnc.html</div>
+
+  <div class="wl steel" style="left:326px;top:1326px">git push main</div>
+  <div class="wl multi steel" style="left:975px;top:1160px;width:190px;font-size:9px">
+    SSH :22 → bash scripts/deploy.sh<br>
+    git reset --hard origin/main<br>
+    pip install -e . · playwright install<br>
+    systemctl restart browseruse<br>
+    health-check → auto-rollback</div>
+  <div class="wl steel" style="left:318px;top:700px;transform:rotate(-90deg);transform-origin:left top">dev bot token — separate poller, never collides with prod</div>
+
+  <!-- handoff sequence badges -->
+  <div class="badge" style="left:622px;top:744px">1</div>
+  <div class="badge" style="left:599px;top:420px">2</div>
+  <div class="badge" style="left:146px;top:560px">3</div>
+  <div class="badge" style="left:301px;top:250px">4</div>
+
+</div>
+</div>
+
+<!-- ================= ANNOTATIONS ================= -->
+<section class="notes">
+  <div class="note">
+    <h3><span class="sw"></span>Task flow</h3>
+    <p>You message the bot (or the <b>scheduler</b> fires a cron job) → the
+       <b>gateway</b> hands the raw request to the <b>intent router</b>, an LLM call
+       that picks a capability from the <b>registry</b> and extracts typed params.
+       The capability (<b>GeneralBrowse</b> for one-offs, <b>BatchCrawl</b> for
+       long-horizon harvesting) composes the shared substrate:
+       <b>BrowserAgentRunner</b> wraps browser-use, which drives the headful Chromium
+       over CDP against the target web — <b>API-first, browser-second</b>.
+       Results and artifacts land in the workspace; a summary returns to Telegram.</p>
+  </div>
+
+  <div class="note accent">
+    <h3><span class="sw"></span>Login handoff · human-in-the-loop</h3>
+    <ol>
+      <li>The per-step <b>handoff hook</b> detects a login/2FA wall and pauses the agent — it never evades.</li>
+      <li>The gateway sends you a 🔐 link over Telegram: <span class="kbd">http://&lt;EC2-IP&gt;:8770/vnc.html?token=…</span> — short-lived, single-use.</li>
+      <li>Your phone opens <b>noVNC</b>, a live view of the agent's own browser; you log in exactly as if sitting at the machine.</li>
+      <li>You send <span class="kbd">/done</span> → agent resumes. Cookies persist in the <b>persistent profile</b>, so logins are rare (once per site until expiry).</li>
+    </ol>
+  </div>
+
+  <div class="note steel">
+    <h3><span class="sw"></span>CI/CD · push-to-deploy</h3>
+    <p><span class="kbd">git push main</span> triggers GitHub Actions: a <b>test job on
+       ubuntu-latest</b> (same OS family as prod) gates the deploy — a Linux failure
+       blocks shipping. The <b>deploy job</b> SSHes into EC2 and runs
+       <span class="kbd">deploy.sh</span>: hard-reset to origin/main, reinstall,
+       restart the systemd service, then <b>health-check with auto-rollback</b> to the
+       previous commit if the new version fails to start.
+       <span class="kbd">.env</span>, workspace, and browser profile are git-ignored
+       and survive every deploy. Rollback = deploy any tag. No Docker — deliberate,
+       until multi-box scale.</p>
+  </div>
+
+  <div class="note teal">
+    <h3><span class="sw"></span>Observability · Langfuse</h3>
+    <p>Every run emits <b>per-step traces</b> (plan → fetch → parse → notify) with
+       status, latency, and token cost. Domain metrics ride on top: new-job detection
+       precision/recall, dedup correctness, extraction field accuracy against a
+       hand-labeled gold set. <b>Scheduled evals</b> re-run these and alert
+       regressions back through Telegram — the layer that makes this a platform,
+       not a script.</p>
+  </div>
+</section>
+
+<!-- ================= FACTS ================= -->
+<div class="facts">
+  <div class="facts-inner">
+    <div class="fact"><div class="k">Host</div><div class="v">EC2 t3.small · Ubuntu 24.04</div></div>
+    <div class="fact"><div class="k">Service</div><div class="v mono">systemd browseruse</div></div>
+    <div class="fact"><div class="k">Open ports</div><div class="v">22 (CI/dev) · 8770 (noVNC)</div></div>
+    <div class="fact"><div class="k">LLM</div><div class="v">OpenAI API · vision on</div></div>
+    <div class="fact"><div class="k">Engine</div><div class="v">browser-use + CDP · Xvfb :99</div></div>
+    <div class="fact"><div class="k">Store</div><div class="v">workspace ledger (SQLite/JSON)</div></div>
+  </div>
+</div>
+
+</body>
+</html>

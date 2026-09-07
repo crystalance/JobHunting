@@ -20,15 +20,17 @@
 
 ## Q2 — "Why planner-free? What breaks with a planner, and what did you give up?"
 
-> "Three things break with a centralized planner on this workload.
+*(Benefit-first framing: lead with what the flat design GIVES, use planner-worker as a one-line foil, end with honest costs.)*
+
+> "The flat design buys you three properties that are hard to get any other way.
 >
-> First, the planner is a single point of failure with amplification. If it forgets a source or splits the task along the wrong axis, all N workers inherit the mistake — one bad LLM call becomes N missed rows. On a per-cell metric that's brutal.
+> First — and this is the core one — **failure containment**. Every decision is local to the peer that made it. If a peer mis-claims a task, misses a source, or votes to stop too early, it wastes exactly one peer's iteration, and the next peer that locks the blackboard re-derives the work list and corrects it. The contrast: with a central planner, every worker is downstream of one planning call, so the same mistake becomes N missed rows instead of one. LLM agents fail constantly, so a design where any peer's good call can rescue any other peer's bad one is worth real money.
 >
-> Second, the planner recreates the exact context-pressure problem we went multi-agent to escape. To re-plan, it has to hold the whole query, every subtask, and every partial result in one window — so your most critical agent has the most overloaded context in the system.
+> Second, **new work is absorbed with zero synchronization**. Wide search discovers sources mid-run — a peer that finds new evidence at second 47 appends a claim at second 48, while everyone else keeps working. There's no replanning round-trip because there's no plan to replan; the coordination cost of adapting is one lock and one append, versus a global barrier where workers idle while one overloaded context re-decomposes.
 >
-> Third, wide search isn't knowable up front. Sources get discovered mid-run, and retrieval often succeeds only when a different agent retries from a different angle. A planner can re-plan, but every re-plan is a global barrier — workers wait while one context re-decomposes. In HDMAS, a peer that finds new evidence just appends a claim on its next iteration. No barrier.
+> Third, **coordination invariants live in the protocol, not in an LLM's judgment**. Is this task in-flight or abandoned? — lease on the claim. Did 'no results' mean empty or unreachable? — an explicit outcome field written before the lock is released. Conflicting evidence? — resolved by an append that any later peer can audit. A planner has to get all of these right implicitly, in-context, on every re-plan; here they're structural and deterministic.
 >
-> What I gave up — and I'd say this honestly: distributed termination is genuinely harder, which is why I needed an explicit vote-stop and wake-agent protocol. There's lock contention on the shared board. And there's a planning tax — every peer re-derives the full subtask list every iteration, which is redundant tokens. The bet is that on wide, weakly-coupled work where individual agent failures are common, failure containment is worth more than planning efficiency — and the data supported that."
+> What I paid for this — and I'd say it honestly: distributed termination is genuinely harder, which is why I needed the vote-stop and wake-agent protocol. There's lock contention on the shared board. And there's a planning tax — every peer re-derives the subtask list each iteration. On wide, weakly-coupled work where peer failures are common, the containment won: plus 11.4 percent relative Row-F1 over the same backend single agent."
 
 ---
 

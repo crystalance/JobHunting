@@ -1,6 +1,11 @@
 # TikTok Prep Plan — 2 weeks, BQ + spoken English priority
 
-> Reply to Suki/Mengya first: express interest, ask about the process (number of rounds, whether there's an OA), and schedule the first round ~2 weeks out. That buys you a defined runway.
+> **UPDATE (Sep 1): Round 1 format confirmed by recruiter — 60 min, system design + AI project
+> deep-dive. No coding mentioned.** Priority pivot: system design is now the #1 gap (never
+> practiced) — see `round1_system_design_prep.md` for the from-zero 2-week SD plan. Deep-dive
+> half is already covered by the spoken-answer files. Keep 2–3 LC mediums/week as maintenance
+> only; later rounds will still have coding. Book the interview ~2.5 weeks out (recruiter allows
+> 3), prefer 10am–5pm PT slots (= 1–8pm ET).
 
 ## Guiding principle
 

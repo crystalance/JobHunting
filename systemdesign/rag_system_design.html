@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Design a RAG System — Round-1 System Design</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#F1F0EB;
+    --grid:#E3E2DA;
+    --grid2:#D2D1C6;
+    --ink:#22262E;
+    --ink-soft:#5C6370;
+    --card:#FFFFFF;
+    --ingest:#7A4FBF;   /* offline ingestion plane */
+    --store:#B3701A;    /* shared storage & indexes */
+    --query:#0F7A5A;    /* online query plane */
+    --hot:#C2452D;      /* HNSW / the algorithm */
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--paper);color:var(--ink);font-family:'Space Grotesk',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+  .mono{font-family:'IBM Plex Mono',ui-monospace,monospace}
+  .wrap{max-width:1200px;margin:0 auto;padding:0 24px}
+
+  header{padding:48px 0 10px}
+  .eyebrow{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--hot);font-weight:600}
+  header h1{font-size:38px;font-weight:700;letter-spacing:-.015em;margin:8px 0 10px}
+  header p.lede{max-width:840px;font-size:14.5px;line-height:1.6;color:var(--ink-soft)}
+
+  /* pacing strip */
+  .pacing{display:flex;gap:0;margin:26px 0 8px;border:1.5px solid var(--ink);border-radius:4px;overflow:hidden}
+  .pace{flex:1;padding:9px 12px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.04em;border-right:1.5px solid var(--ink);background:#fff}
+  .pace:last-child{border-right:none}
+  .pace b{display:block;font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:2px}
+  .pace span{color:var(--ink-soft)}
+
+  section{margin:44px 0}
+  h2{font-size:22px;font-weight:700;letter-spacing:-.01em;margin-bottom:4px}
+  h2 .num{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--hot);vertical-align:middle;margin-right:8px;letter-spacing:.1em}
+  .h2sub{font-size:13px;color:var(--ink-soft);margin-bottom:18px;max-width:820px;line-height:1.55}
+
+  .cards{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .card{background:var(--card);border:1.5px solid var(--ink);border-radius:4px;padding:16px 18px;box-shadow:3px 3px 0 rgba(34,38,46,.08)}
+  .card h3{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;margin-bottom:10px}
+  .card ul{list-style:none}
+  .card li{font-size:13px;line-height:1.5;padding:5px 0 5px 18px;position:relative;color:var(--ink)}
+  .card li::before{content:"";position:absolute;left:2px;top:12px;width:7px;height:7px;border:1.5px solid var(--ink);border-radius:1px}
+  .card li b{font-weight:600}
+  .card li .why{color:var(--ink-soft)}
+  .card.fn h3{color:var(--query)} .card.fn li::before{border-color:var(--query)}
+  .card.nfr h3{color:var(--store)} .card.nfr li::before{border-color:var(--store)}
+
+  /* estimates */
+  .est{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  .est .e{background:#fff;border:1.5px solid var(--ink);border-radius:4px;padding:14px 15px;box-shadow:3px 3px 0 rgba(34,38,46,.08)}
+  .est .e .k{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-soft)}
+  .est .e .v{font-size:21px;font-weight:700;margin:5px 0 3px}
+  .est .e .d{font-size:11.5px;line-height:1.45;color:var(--ink-soft)}
+  .estnote{margin-top:12px;font-size:12.5px;color:var(--ink-soft);line-height:1.55;max-width:900px}
+  .estnote b{color:var(--ink)}
+
+  /* ---------- architecture board ---------- */
+  .board-scroll{overflow-x:auto;margin:0 -24px;padding:0 24px}
+  .board{
+    position:relative;width:1360px;height:930px;margin:10px auto 0;
+    background:
+      repeating-linear-gradient(0deg,transparent 0 31px,var(--grid) 31px 32px),
+      repeating-linear-gradient(90deg,transparent 0 31px,var(--grid) 31px 32px),
+      repeating-linear-gradient(0deg,transparent 0 159px,var(--grid2) 159px 160px),
+      repeating-linear-gradient(90deg,transparent 0 159px,var(--grid2) 159px 160px),
+      #F6F5F0;
+    border:2px solid var(--ink);border-radius:3px;
+  }
+  svg.wires{position:absolute;inset:0;width:1360px;height:930px;pointer-events:none;z-index:3}
+  .zone{position:absolute;border:1.5px dashed rgba(34,38,46,.4);border-radius:5px;z-index:1}
+  .zone>.zlabel{position:absolute;top:-9px;left:14px;background:#F6F5F0;padding:0 8px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase}
+  .zone.zi{border-color:var(--ingest)} .zone.zi>.zlabel{color:var(--ingest)}
+  .zone.zs{border-color:var(--store)} .zone.zs>.zlabel{color:var(--store)}
+  .zone.zq{border-color:var(--query)} .zone.zq>.zlabel{color:var(--query)}
+
+  .node{position:absolute;background:var(--card);border:1.5px solid var(--ink);border-radius:3px;padding:10px 12px;z-index:2;box-shadow:3px 3px 0 rgba(34,38,46,.10)}
+  .node h4{font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;margin-bottom:4px}
+  .node p{font-size:11.5px;line-height:1.42;color:var(--ink-soft)}
+  .node p b{color:var(--ink);font-weight:600}
+  .node.ni h4{color:var(--ingest)} .node.ns h4{color:var(--store)} .node.nq h4{color:var(--query)}
+  .node.hero{border-color:var(--hot);box-shadow:3px 3px 0 rgba(194,69,45,.18)}
+  .node.hero h4{color:var(--hot)}
+  .legend{display:flex;gap:22px;margin-top:12px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--ink-soft)}
+  .legend .sw{display:inline-block;width:22px;height:0;border-top:2.5px solid;vertical-align:middle;margin-right:6px}
+  .legend .dash{border-top-style:dashed}
+
+  /* data flow steps */
+  .steps{counter-reset:step;max-width:920px}
+  .step{display:flex;gap:14px;padding:11px 0;border-bottom:1px solid var(--grid2)}
+  .step:last-child{border-bottom:none}
+  .step .n{counter-increment:step;flex:0 0 30px;height:30px;border:1.5px solid var(--ink);border-radius:3px;background:#fff;
+    font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center}
+  .step .n::before{content:counter(step)}
+  .step .t{font-size:13.5px;line-height:1.55}
+  .step .t b{font-weight:600}
+  .step .t .lat{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--hot);white-space:nowrap}
+
+  /* trade-off table */
+  table{width:100%;border-collapse:collapse;background:#fff;border:1.5px solid var(--ink);box-shadow:3px 3px 0 rgba(34,38,46,.08);font-size:12.5px}
+  th{font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;text-align:left;
+     padding:10px 12px;border-bottom:1.5px solid var(--ink);background:var(--paper)}
+  td{padding:10px 12px;border-bottom:1px solid var(--grid2);vertical-align:top;line-height:1.5}
+  tr:last-child td{border-bottom:none}
+  td.dec{font-weight:600;white-space:nowrap}
+  td .pick{color:var(--query);font-weight:600}
+  td .cost{color:var(--hot)}
+
+  /* HNSW section */
+  .hnsw-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:20px;align-items:start}
+  .hnsw-fig{background:#fff;border:1.5px solid var(--ink);border-radius:4px;padding:14px;box-shadow:3px 3px 0 rgba(34,38,46,.10)}
+  .hnsw-fig .cap{font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--ink-soft);margin-top:8px;line-height:1.5}
+  .hnsw-fig .cap b{color:var(--hot)}
+  .params{list-style:none}
+  .params li{padding:9px 0;border-bottom:1px solid var(--grid2);font-size:13px;line-height:1.5}
+  .params li:last-child{border-bottom:none}
+  .params code{font-family:'IBM Plex Mono',monospace;font-size:12px;background:var(--paper);border:1px solid var(--grid2);border-radius:3px;padding:1px 6px;font-weight:600}
+
+  .spoken{background:#fff;border:1.5px solid var(--ink);border-left:5px solid var(--query);border-radius:4px;
+    padding:16px 20px;margin-top:18px;box-shadow:3px 3px 0 rgba(34,38,46,.08)}
+  .spoken .tag{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--query);font-weight:600;margin-bottom:8px}
+  .spoken p{font-size:13.5px;line-height:1.65}
+  .spoken.hotline{border-left-color:var(--hot)} .spoken.hotline .tag{color:var(--hot)}
+
+  footer{margin:56px 0 40px;padding-top:16px;border-top:2px solid var(--ink);
+    font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink-soft);line-height:1.7}
+  footer b{color:var(--ink)}
+
+  /* greedy search animation */
+  .gpath{stroke-dasharray:6 5;animation:march 1.4s linear infinite}
+  @keyframes march{to{stroke-dashoffset:-22}}
+  @media (prefers-reduced-motion: reduce){.gpath{animation:none}}
+  @media (max-width:900px){.cards,.est,.hnsw-grid{grid-template-columns:1fr}.pacing{flex-wrap:wrap}.pace{flex-basis:50%}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">System Design · Round-1 Pattern · RAG</div>
+  <h1>Design a RAG System</h1>
+  <p class="lede">Retrieval-Augmented Generation: given a private corpus (docs, wikis, code, tickets), answer natural-language
+  questions with grounded, cited responses. Follow the NG round-1 skeleton: requirements → estimates → architecture →
+  one deep dive. The deep dive here is the vector index — <b>HNSW</b> (Hierarchical Navigable Small World; often mistyped
+  "HSWN") — because it's the component with the most interesting trade-offs.</p>
+
+  <div class="pacing">
+    <div class="pace"><b>0–5 min</b><span>requirements + confirm scope</span></div>
+    <div class="pace"><b>5–10</b><span>scale estimates</span></div>
+    <div class="pace"><b>10–25</b><span>architecture + data flow</span></div>
+    <div class="pace"><b>25–40</b><span>deep dive (index / rerank / freshness)</span></div>
+    <div class="pace"><b>40–45</b><span>bottlenecks + evolution</span></div>
+  </div>
+</header>
+
+<!-- ============ 1. REQUIREMENTS ============ -->
+<section>
+  <h2><span class="num">01</span>Requirements — say these first, then confirm</h2>
+  <p class="h2sub">Scope the corpus and the query pattern before drawing anything. "Is this over a fixed document set or a
+  living one? Do answers need citations? What's the latency budget?" — three questions that change the whole design.</p>
+  <div class="cards">
+    <div class="card fn">
+      <h3>Functional</h3>
+      <ul>
+        <li><b>Ingest</b>: connect sources (files, wiki, code, DB), parse → chunk → embed → index. <span class="why">Continuous, not one-shot: docs change.</span></li>
+        <li><b>Query</b>: NL question → retrieve relevant chunks → generate a grounded answer <b>with citations</b> back to source.</li>
+        <li><b>Freshness</b>: an edited doc is reflected in answers within minutes (define SLA — this drives the whole ingest design).</li>
+        <li><b>Access control</b>: a user only retrieves chunks they're allowed to read. <span class="why">Filter at retrieval, never after generation.</span></li>
+        <li><b>Feedback</b>: thumbs up/down and "wrong source" reports feed an eval set.</li>
+      </ul>
+    </div>
+    <div class="card nfr">
+      <h3>Non-functional</h3>
+      <ul>
+        <li><b>Latency</b>: p95 time-to-first-token ≤ ~1.5 s; retrieval itself ≤ 200 ms of that budget.</li>
+        <li><b>Quality</b>: recall@k is the retrieval metric that caps everything downstream — a fact not retrieved cannot be answered. Target recall@8 ≥ 90% on an eval set.</li>
+        <li><b>Groundedness</b>: no claim without a retrieved supporting chunk; hallucination is a correctness bug, not a style issue.</li>
+        <li><b>Cost</b>: LLM tokens dominate; retrieval exists partly to keep prompts small.</li>
+        <li><b>Scale</b>: corpus grows 10× without re-architecture; index rebuilds can't cause downtime.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 2. ESTIMATES ============ -->
+<section>
+  <h2><span class="num">02</span>Scale estimates — do this unprompted</h2>
+  <p class="h2sub">Assume an enterprise knowledge base: 10 M documents, 20 k users. The numbers decide the index type.</p>
+  <div class="est">
+    <div class="e"><div class="k">Chunks</div><div class="v">~50 M</div><div class="d">10 M docs × ~5 chunks (500 tokens each, 15% overlap)</div></div>
+    <div class="e"><div class="k">Vector storage</div><div class="v">200 GB</div><div class="d">50 M × 1024-dim fp32 (4 KB each). HNSW graph adds ~1.3–1.5×. int8 quantization → ~50 GB</div></div>
+    <div class="e"><div class="k">Query load</div><div class="v">~60 QPS peak</div><div class="d">20 k users × 15 queries/day ≈ 300 k/day ≈ 3.5 avg QPS, ~20× peak factor</div></div>
+    <div class="e"><div class="k">Latency budget</div><div class="v">1.5 s TTFT</div><div class="d">embed 20 ms · ANN 30 ms · BM25 20 ms · rerank 120 ms · assembly 10 ms · LLM TTFT ~800 ms</div></div>
+  </div>
+  <p class="estnote"><b>The conclusion to say out loud:</b> 200 GB of vectors doesn't fit one node's RAM comfortably → either
+  <b>quantize</b> (int8/PQ), <b>shard</b> the index, or go <b>disk-based</b> (DiskANN). At 60 QPS with 30 ms ANN search a few
+  replicas suffice — retrieval is not the bottleneck, <b>ingest throughput and LLM cost are</b>. Embedding 50 M chunks at
+  ~1 ms/chunk on GPU batch ≈ 14 GPU-hours per full re-embed: fine occasionally, painful daily — hence incremental indexing.</p>
+</section>
+
+<!-- ============ 3. ARCHITECTURE ============ -->
+<section>
+  <h2><span class="num">03</span>High-level architecture</h2>
+  <p class="h2sub">Two planes joined by shared storage: an <b style="color:var(--ingest)">offline ingestion plane</b> (throughput-optimized,
+  async, retryable) and an <b style="color:var(--query)">online query plane</b> (latency-optimized). They scale, fail, and deploy independently —
+  say that sentence; it's the design's thesis.</p>
+
+  <div class="board-scroll">
+  <div class="board">
+    <!-- zones -->
+    <div class="zone zi" style="left:20px;top:36px;width:400px;height:858px"><span class="zlabel">Offline · Ingestion plane</span></div>
+    <div class="zone zs" style="left:460px;top:36px;width:360px;height:858px"><span class="zlabel">Shared storage &amp; indexes</span></div>
+    <div class="zone zq" style="left:860px;top:36px;width:478px;height:858px"><span class="zlabel">Online · Query plane (≤1.5 s)</span></div>
+
+    <!-- wires -->
+    <svg class="wires" viewBox="0 0 1360 930">
+      <defs>
+        <marker id="a-ing" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#7A4FBF"/></marker>
+        <marker id="a-qry" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#0F7A5A"/></marker>
+        <marker id="a-sto" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#B3701A"/></marker>
+      </defs>
+      <!-- ingestion vertical flow -->
+      <path d="M240,148 V172" stroke="#7A4FBF" stroke-width="2" fill="none" marker-end="url(#a-ing)"/>
+      <path d="M240,250 V274" stroke="#7A4FBF" stroke-width="2" fill="none" marker-end="url(#a-ing)"/>
+      <path d="M240,352 V376" stroke="#7A4FBF" stroke-width="2" fill="none" marker-end="url(#a-ing)"/>
+      <path d="M240,454 V478" stroke="#7A4FBF" stroke-width="2" fill="none" marker-end="url(#a-ing)"/>
+      <path d="M240,556 V580" stroke="#7A4FBF" stroke-width="2" fill="none" marker-end="url(#a-ing)"/>
+      <!-- index writer -> three stores -->
+      <path d="M400,616 H452 V128 H472" stroke="#7A4FBF" stroke-width="2" fill="none" marker-end="url(#a-ing)"/>
+      <path d="M400,626 H452 V262 H472" stroke="#7A4FBF" stroke-width="2" fill="none" marker-end="url(#a-ing)"/>
+      <path d="M400,636 H452 V396 H472" stroke="#7A4FBF" stroke-width="2" fill="none" marker-end="url(#a-ing)"/>
+      <!-- query vertical flow -->
+      <path d="M1096,140 V162" stroke="#0F7A5A" stroke-width="2" fill="none" marker-end="url(#a-qry)"/>
+      <path d="M1096,240 V262" stroke="#0F7A5A" stroke-width="2" fill="none" marker-end="url(#a-qry)"/>
+      <path d="M1096,346 V368" stroke="#0F7A5A" stroke-width="2" fill="none" marker-end="url(#a-qry)"/>
+      <path d="M1096,462 V484" stroke="#0F7A5A" stroke-width="2" fill="none" marker-end="url(#a-qry)"/>
+      <path d="M1096,564 V586" stroke="#0F7A5A" stroke-width="2" fill="none" marker-end="url(#a-qry)"/>
+      <path d="M1096,672 V694" stroke="#0F7A5A" stroke-width="2" fill="none" marker-end="url(#a-qry)"/>
+      <path d="M1096,776 V798" stroke="#0F7A5A" stroke-width="2" fill="none" marker-end="url(#a-qry)"/>
+      <!-- hybrid retrieval <-> vector + bm25 -->
+      <path d="M880,404 H846 V116 H806" stroke="#0F7A5A" stroke-width="2" stroke-dasharray="7 5" fill="none" marker-end="url(#a-qry)"/>
+      <path d="M880,420 H832 V250 H806" stroke="#0F7A5A" stroke-width="2" stroke-dasharray="7 5" fill="none" marker-end="url(#a-qry)"/>
+      <!-- rerank -> metadata (fetch text) -->
+      <path d="M880,524 H818 V420 H806" stroke="#0F7A5A" stroke-width="2" stroke-dasharray="7 5" fill="none" marker-end="url(#a-qry)"/>
+      <!-- query understanding -> cache -->
+      <path d="M880,300 H860 V560 H806" stroke="#B3701A" stroke-width="2" stroke-dasharray="3 5" fill="none" marker-end="url(#a-sto)"/>
+      <!-- feedback loop back to eval -->
+      <path d="M1330,838 H1348 V908 H236 V886" stroke="#B3701A" stroke-width="2" stroke-dasharray="3 5" fill="none" marker-end="url(#a-sto)"/>
+    </svg>
+
+    <!-- ingestion nodes -->
+    <div class="node ni" style="left:40px;top:70px;width:400px;max-width:360px">
+      <h4>Sources &amp; connectors</h4>
+      <p>Wiki, Drive, git, tickets, DB dumps. <b>Webhooks/CDC</b> for change events; periodic crawl as reconciliation backstop.</p>
+    </div>
+    <div class="node ni" style="left:40px;top:172px;width:360px">
+      <h4>Message queue (Kafka/SQS)</h4>
+      <p>Decouples burst crawl from GPU embed. <b>Retry + DLQ</b>; per-doc idempotency key <b>doc_id@version</b> so replays don't duplicate.</p>
+    </div>
+    <div class="node ni" style="left:40px;top:274px;width:360px">
+      <h4>Parser / normalizer</h4>
+      <p>PDF/HTML → text, table extraction, dedupe, PII scrub. <b>The quality ceiling lives here</b> — garbage chunks poison every stage downstream.</p>
+    </div>
+    <div class="node ni" style="left:40px;top:376px;width:360px">
+      <h4>Chunker</h4>
+      <p><b>Structure-aware</b> (headings, code blocks) &gt; fixed-size. 300–800 tokens, 10–20% overlap; store parent-doc pointer for context expansion.</p>
+    </div>
+    <div class="node ni" style="left:40px;top:478px;width:360px">
+      <h4>Embedder (GPU batch)</h4>
+      <p>Batched, throughput-optimized. <b>Embedding model version pinned per index</b> — query and corpus must share vector space.</p>
+    </div>
+    <div class="node ni" style="left:40px;top:580px;width:360px">
+      <h4>Index writer</h4>
+      <p>Upserts to vector + keyword + metadata stores <b>transactionally per chunk batch</b>; deletes are tombstoned, compacted off-peak.</p>
+    </div>
+    <div class="node ni" style="left:40px;top:690px;width:360px">
+      <h4>Re-embed / refresh worker</h4>
+      <p>On embedding-model upgrade: <b>build index v2 side-by-side, shadow-test recall, flip alias</b> — never mutate the live index in place.</p>
+    </div>
+    <div class="node ni" style="left:40px;top:800px;width:360px">
+      <h4>Eval harness (offline)</h4>
+      <p>Golden Q→chunk set; every chunker/embedder/index change gets <b>recall@k regression-tested</b> before rollout. Feedback loop lands here.</p>
+    </div>
+
+    <!-- storage nodes -->
+    <div class="node ns hero" style="left:480px;top:70px;width:326px">
+      <h4>Vector index — HNSW ★</h4>
+      <p>ANN top-k in ~ms. <b>The deep-dive component</b> — see §06. Params <b>M / efSearch</b> are the recall-vs-latency knob.</p>
+    </div>
+    <div class="node ns" style="left:480px;top:204px;width:326px">
+      <h4>Keyword index (BM25)</h4>
+      <p>Exact tokens: IDs, error codes, function names — everything embeddings blur. <b>Hybrid = vector ∪ BM25.</b></p>
+    </div>
+    <div class="node ns" style="left:480px;top:338px;width:326px">
+      <h4>Metadata / chunk store</h4>
+      <p>Chunk text, source URI, <b>ACL tags</b>, timestamps, doc version. Retrieval filters ACL <b>inside the index query</b>, not after.</p>
+    </div>
+    <div class="node ns" style="left:480px;top:472px;width:326px">
+      <h4>Caches</h4>
+      <p><b>Embedding cache</b> (query string → vector) and <b>semantic answer cache</b> (similar-enough query → cached answer, short TTL).</p>
+    </div>
+    <div class="node ns" style="left:480px;top:590px;width:326px">
+      <h4>Object store (raw docs)</h4>
+      <p>Originals kept immutable — reprocessing is <b>replay from source of truth</b>, same artifact discipline as CI/CD.</p>
+    </div>
+
+    <!-- query nodes -->
+    <div class="node nq" style="left:880px;top:70px;width:432px">
+      <h4>Client + API gateway</h4>
+      <p>Auth, rate limit, streaming response channel (SSE/WebSocket).</p>
+    </div>
+    <div class="node nq" style="left:880px;top:162px;width:432px">
+      <h4>Query understanding</h4>
+      <p>Rewrite follow-ups into standalone queries (cheap LLM), optional decomposition; <b>embed the query</b> (20 ms, cache hit ~40%).</p>
+    </div>
+    <div class="node nq" style="left:880px;top:262px;width:432px">
+      <h4>Hybrid retrieval</h4>
+      <p>Vector top-50 + BM25 top-50 in parallel → merge with <b>RRF</b> (reciprocal rank fusion — no score calibration needed) → ~top-50, ACL-filtered.</p>
+    </div>
+    <div class="node nq" style="left:880px;top:368px;width:432px">
+      <h4>Reranker (cross-encoder)</h4>
+      <p>Scores (query, chunk) <b>jointly</b> — far more accurate than bi-encoder cosine. 50 → top-8. ~120 ms. The single biggest quality lever after chunking.</p>
+    </div>
+    <div class="node nq" style="left:880px;top:484px;width:432px">
+      <h4>Context assembly</h4>
+      <p>Dedupe near-identical chunks, expand to parent section if budget allows, order stable, attach <b>citation map</b> chunk→URI.</p>
+    </div>
+    <div class="node nq" style="left:880px;top:586px;width:432px">
+      <h4>LLM generation (streamed)</h4>
+      <p>Grounding prompt: <b>"answer only from context, cite chunk ids, say 'not found' when absent."</b> Stream tokens; TTFT dominates UX.</p>
+    </div>
+    <div class="node nq" style="left:880px;top:694px;width:432px">
+      <h4>Groundedness check</h4>
+      <p>Cheap verifier: every claim maps to a cited chunk? On failure → regenerate once or degrade to "closest sources" list.</p>
+    </div>
+    <div class="node nq" style="left:880px;top:798px;width:432px">
+      <h4>Feedback + telemetry</h4>
+      <p>Thumbs, "wrong source", retrieval traces → <b>eval set</b> (dashed amber loop back to the offline harness).</p>
+    </div>
+  </div>
+  </div>
+  <div class="legend">
+    <span><span class="sw" style="border-color:var(--ingest)"></span>ingest flow (async)</span>
+    <span><span class="sw dash" style="border-color:var(--query)"></span>query-time reads</span>
+    <span><span class="sw dash" style="border-color:var(--store)"></span>cache / feedback loops</span>
+  </div>
+</section>
+
+<!-- ============ 4. DATA FLOW ============ -->
+<section>
+  <h2><span class="num">04</span>Walk one query end-to-end</h2>
+  <p class="h2sub">Narrate this while pointing at the diagram — interviewers score the walkthrough, not the boxes.</p>
+  <div class="steps">
+    <div class="step"><span class="n"></span><div class="t"><b>"How do I rotate the deploy SSH key?"</b> arrives; gateway authenticates, opens a streaming channel. <span class="lat">~5 ms</span></div></div>
+    <div class="step"><span class="n"></span><div class="t">Query understanding rewrites the follow-up into a standalone question and embeds it — embedding cache checked first. <span class="lat">~20 ms</span></div></div>
+    <div class="step"><span class="n"></span><div class="t">Hybrid retrieval fans out in parallel: HNSW returns 50 nearest vectors <span class="lat">~30 ms</span>, BM25 returns 50 keyword hits ("SSH", "rotate") <span class="lat">~20 ms</span>. RRF merges; ACL filter applied as an index-level predicate.</div></div>
+    <div class="step"><span class="n"></span><div class="t">Cross-encoder reranks 50 candidates jointly with the query → top 8. This is where "mentions SSH" is separated from "explains rotation". <span class="lat">~120 ms</span></div></div>
+    <div class="step"><span class="n"></span><div class="t">Context assembly dedupes, pulls the parent section of the best chunk, builds the citation map. <span class="lat">~10 ms</span></div></div>
+    <div class="step"><span class="n"></span><div class="t">LLM generates with a grounding prompt, streaming; citations rendered as links. <span class="lat">TTFT ~800 ms</span></div></div>
+    <div class="step"><span class="n"></span><div class="t">Groundedness verifier spot-checks claims against cited chunks; trace + user feedback logged into the eval set — the flywheel that makes next month's system better.</div></div>
+  </div>
+</section>
+
+<!-- ============ 5. TRADE-OFFS ============ -->
+<section>
+  <h2><span class="num">05</span>Trade-offs — the scoring surface</h2>
+  <p class="h2sub">Every row is a "why did you choose X?" waiting to happen. Format: pick, justify with the workload, name what you gave up.</p>
+  <table>
+    <thead><tr><th style="width:16%">Decision</th><th style="width:30%">Options</th><th style="width:32%">Pick &amp; why</th><th>What you give up</th></tr></thead>
+    <tbody>
+      <tr><td class="dec">Chunking</td>
+        <td>Fixed-size · structure-aware · semantic (embed-split) · parent-child</td>
+        <td><span class="pick">Structure-aware 300–800 tok + parent pointers.</span> Respects headings/code blocks; small chunks retrieve precisely, parent expansion restores context.</td>
+        <td class="cost">More pipeline complexity than fixed-size; bad source structure degrades it.</td></tr>
+      <tr><td class="dec">Retrieval mode</td>
+        <td>Vector-only · BM25-only · hybrid + RRF</td>
+        <td><span class="pick">Hybrid.</span> Embeddings miss exact identifiers (error codes, API names); BM25 misses paraphrase. Failure modes are complementary; RRF fuses without score calibration.</td>
+        <td class="cost">Two indexes to keep consistent; slightly higher read cost.</td></tr>
+      <tr><td class="dec">ANN index</td>
+        <td>Flat (exact) · IVF · IVF-PQ · <b>HNSW</b> · DiskANN</td>
+        <td><span class="pick">HNSW while RAM allows (quantized ~50 GB, sharded).</span> Best recall/latency at our scale, incremental inserts (no retrain), efSearch is a live tuning knob.</td>
+        <td class="cost">RAM-hungry; deletes need tombstone+compact; slower to build than IVF.</td></tr>
+      <tr><td class="dec">Reranking</td>
+        <td>None · cross-encoder · LLM-as-reranker</td>
+        <td><span class="pick">Cross-encoder 50→8.</span> Biggest quality-per-ms after chunking; lets ANN recall stay loose (cheap) while precision is recovered late.</td>
+        <td class="cost">+120 ms and a GPU service to run; another model to version.</td></tr>
+      <tr><td class="dec">top-k</td>
+        <td>k=3 … k=20 into the prompt</td>
+        <td><span class="pick">Retrieve 50, rerank to 8.</span> Wide-then-narrow: recall early, precision late — same shape as funnel ranking in recsys.</td>
+        <td class="cost">More prompt tokens than k=3; diminishing returns past ~10.</td></tr>
+      <tr><td class="dec">Embedding model</td>
+        <td>Small (fast/cheap) · large (better recall) · fine-tuned</td>
+        <td><span class="pick">Mid-size general model first; fine-tune only with eval evidence.</span> The eval harness decides upgrades, not vibes.</td>
+        <td class="cost">Any model change = full re-embed (14 GPU-h) + side-by-side index swap.</td></tr>
+      <tr><td class="dec">Freshness</td>
+        <td>Batch nightly · streaming upsert · hybrid</td>
+        <td><span class="pick">Streaming upserts via queue + nightly reconciliation crawl.</span> Webhooks give minutes-level freshness; the crawl catches missed events.</td>
+        <td class="cost">Idempotency and ordering complexity (doc_id@version discipline).</td></tr>
+      <tr><td class="dec">Vector DB</td>
+        <td>Self-host lib (FAISS/hnswlib) · self-host DB (Milvus/Qdrant) · managed</td>
+        <td><span class="pick">Self-host DB at this scale.</span> Filtered search + replication built in; library-only means rebuilding those features yourself.</td>
+        <td class="cost">Ops burden vs managed; managed costs more and locks you in.</td></tr>
+      <tr><td class="dec">Caching</td>
+        <td>None · embedding cache · semantic answer cache</td>
+        <td><span class="pick">Both.</span> Query embeddings repeat heavily; semantic cache short-circuits the whole pipeline for near-duplicate questions with short TTL.</td>
+        <td class="cost">Semantic cache can serve stale/subtly-wrong answers — needs similarity threshold + TTL care.</td></tr>
+      <tr><td class="dec">Answer safety</td>
+        <td>Trust the LLM · grounding prompt · verifier + citations</td>
+        <td><span class="pick">Citations mandatory + cheap verifier.</span> "Not found" is a first-class answer; ungrounded fluency is a bug.</td>
+        <td class="cost">Extra latency and some false rejections of correct answers.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============ 6. HNSW ============ -->
+<section>
+  <h2><span class="num">06</span>Deep dive — HNSW (Hierarchical Navigable Small World)</h2>
+  <p class="h2sub">The standard in-memory ANN index (FAISS, Milvus, Qdrant, pgvector all ship it). One sentence: <b>a skip list
+  crossed with a proximity graph</b> — sparse top layers with long-range links act as express lanes, the dense bottom layer
+  holds every vector, and search greedily descends. Note the spelling: H-N-S-W.</p>
+
+  <div class="hnsw-grid">
+    <div class="hnsw-fig">
+      <svg viewBox="0 0 560 430" width="100%" role="img" aria-label="HNSW layered graph with greedy search path">
+        <!-- layer planes -->
+        <g>
+          <polygon points="60,20 500,20 540,100 100,100" fill="#F6F5F0" stroke="#22262E" stroke-width="1.5"/>
+          <polygon points="60,150 500,150 540,230 100,230" fill="#F6F5F0" stroke="#22262E" stroke-width="1.5"/>
+          <polygon points="60,280 500,280 540,360 100,360" fill="#F6F5F0" stroke="#22262E" stroke-width="1.5"/>
+          <text x="114" y="40" font-family="IBM Plex Mono" font-size="11" font-weight="600" fill="#5C6370">LAYER 2 — sparse, long links</text>
+          <text x="114" y="170" font-family="IBM Plex Mono" font-size="11" font-weight="600" fill="#5C6370">LAYER 1</text>
+          <text x="114" y="300" font-family="IBM Plex Mono" font-size="11" font-weight="600" fill="#5C6370">LAYER 0 — all 50 M vectors</text>
+        </g>
+        <!-- layer 2 nodes + edges -->
+        <g stroke="#B9B6AA" stroke-width="1.4">
+          <line x1="180" y1="70" x2="420" y2="55"/><line x1="420" y1="55" x2="320" y2="88"/><line x1="180" y1="70" x2="320" y2="88"/>
+        </g>
+        <g fill="#22262E"><circle cx="180" cy="70" r="6"/><circle cx="420" cy="55" r="5"/><circle cx="320" cy="88" r="5"/></g>
+        <!-- layer 1 nodes + edges -->
+        <g stroke="#B9B6AA" stroke-width="1.2">
+          <line x1="170" y1="205" x2="260" y2="175"/><line x1="260" y1="175" x2="360" y2="210"/><line x1="360" y1="210" x2="452" y2="182"/>
+          <line x1="260" y1="175" x2="452" y2="182"/><line x1="170" y1="205" x2="360" y2="210"/>
+        </g>
+        <g fill="#22262E">
+          <circle cx="170" cy="205" r="5"/><circle cx="260" cy="175" r="5"/><circle cx="360" cy="210" r="5"/><circle cx="452" cy="182" r="5"/>
+        </g>
+        <!-- layer 0 nodes + edges -->
+        <g stroke="#C9C6BA" stroke-width="1">
+          <line x1="150" y1="330" x2="215" y2="305"/><line x1="215" y1="305" x2="290" y2="335"/><line x1="290" y1="335" x2="352" y2="308"/>
+          <line x1="352" y1="308" x2="420" y2="336"/><line x1="420" y1="336" x2="480" y2="312"/><line x1="215" y1="305" x2="352" y2="308"/>
+          <line x1="290" y1="335" x2="420" y2="336"/><line x1="150" y1="330" x2="290" y2="335"/>
+        </g>
+        <g fill="#22262E">
+          <circle cx="150" cy="330" r="4.5"/><circle cx="215" cy="305" r="4.5"/><circle cx="290" cy="335" r="4.5"/>
+          <circle cx="352" cy="308" r="4.5"/><circle cx="420" cy="336" r="4.5"/><circle cx="480" cy="312" r="4.5"/>
+        </g>
+        <!-- target -->
+        <circle cx="420" cy="336" r="9" fill="none" stroke="#0F7A5A" stroke-width="2.5"/>
+        <text x="404" y="392" font-family="IBM Plex Mono" font-size="11" font-weight="600" fill="#0F7A5A">nearest neighbor</text>
+        <!-- entry -->
+        <text x="140" y="52" font-family="IBM Plex Mono" font-size="11" font-weight="600" fill="#C2452D">entry point</text>
+        <!-- greedy path: entry L2 -> long hop -> descend -> L1 hops -> descend -> L0 hops -->
+        <path class="gpath" d="M180,70 L420,55" fill="none" stroke="#C2452D" stroke-width="2.6"/>
+        <path class="gpath" d="M420,55 L452,182" fill="none" stroke="#C2452D" stroke-width="2.6" opacity=".85"/>
+        <path class="gpath" d="M452,182 L360,210" fill="none" stroke="#C2452D" stroke-width="2.6"/>
+        <path class="gpath" d="M360,210 L352,308" fill="none" stroke="#C2452D" stroke-width="2.6" opacity=".85"/>
+        <path class="gpath" d="M352,308 L420,336" fill="none" stroke="#C2452D" stroke-width="2.6"/>
+        <!-- descent labels -->
+        <text x="470" y="128" font-family="IBM Plex Mono" font-size="10" fill="#C2452D">descend when no</text>
+        <text x="470" y="141" font-family="IBM Plex Mono" font-size="10" fill="#C2452D">closer neighbor</text>
+      </svg>
+      <p class="cap"><b>Greedy descent:</b> start at the entry point on the top layer, hop to whichever neighbor is closer to the
+      query, and when no neighbor improves, drop one layer and repeat. Top layers cover distance in a few long hops
+      (the skip-list trick); layer 0 does the fine-grained final search with beam width <b>efSearch</b>. Total hops ≈ O(log N).</p>
+    </div>
+
+    <div>
+      <ul class="params">
+        <li><code>M</code> — max links per node per layer (~16–48). Higher M = denser graph = better recall &amp; more RAM
+            (each link is 4–8 bytes × 50 M nodes — this is where the 1.3–1.5× memory overhead comes from).</li>
+        <li><code>efConstruction</code> — candidate-list width while <b>building</b> (~100–400). Higher = better graph quality,
+            slower build. Pay once at index time.</li>
+        <li><code>efSearch</code> — candidate-list (beam) width while <b>querying</b>. <b>The live knob</b>: raise it and recall
+            climbs toward exact search while latency grows roughly linearly. Tune it against the eval set, per traffic class.</li>
+        <li><b>Insert</b> = draw a random top level from an exponential distribution (most nodes exist only in layer 0 — that's
+            what keeps upper layers sparse), greedy-search down to that level, connect the M nearest, prune diverse neighbors.
+            Incremental — <b>no retraining</b>, unlike IVF whose centroids go stale.</li>
+        <li><b>Weaknesses to volunteer</b>: RAM-resident by design; deletes are tombstones + periodic rebuild (graph edges can't
+            be cheaply repaired); build is slower than IVF; recall degrades if the corpus distribution shifts hard and the graph
+            was never rebuilt.</li>
+        <li><b>Why "small world"</b>: Milgram's six-degrees experiments + Kleinberg's result — greedy routing finds short paths
+            only when a few long-range links exist among mostly short ones. HNSW engineers exactly that topology, then adds the
+            hierarchy so the entry point is never far.</li>
+      </ul>
+    </div>
+  </div>
+
+  <table style="margin-top:20px">
+    <thead><tr><th>Index</th><th>Recall</th><th>Latency</th><th>Memory</th><th>Updates</th><th>Use when</th></tr></thead>
+    <tbody>
+      <tr><td class="dec">Flat (exact)</td><td>100%</td><td>O(N) — ms at &lt;1 M</td><td>vectors only</td><td>trivial</td><td>small corpus, or as ground truth for eval</td></tr>
+      <tr><td class="dec">IVF-Flat</td><td>~90–97%</td><td>fast (probe subset)</td><td>vectors + centroids</td><td>retrain centroids as data drifts</td><td>mid-scale, batch-built, RAM-conscious</td></tr>
+      <tr><td class="dec">IVF-PQ</td><td>~80–92%</td><td>fastest</td><td><b>10–30× compressed</b></td><td>retrain</td><td>billions of vectors, RAM is the constraint</td></tr>
+      <tr><td class="dec">HNSW</td><td>~95–99%</td><td>~ms, O(log N) hops</td><td><b>highest</b> (graph + vectors in RAM)</td><td><b>incremental inserts</b>; deletes awkward</td><td>high recall + low latency + live upserts — our pick</td></tr>
+      <tr><td class="dec">DiskANN</td><td>~95%+</td><td>few ms (SSD-aware graph)</td><td>RAM small, SSD large</td><td>batch-ish</td><td>corpus outgrows RAM but recall must stay high</td></tr>
+    </tbody>
+  </table>
+
+  <div class="spoken hotline">
+    <div class="tag">Spoken · 60s if asked "what is HNSW?"</div>
+    <p>"HNSW is the standard in-memory approximate-nearest-neighbor index — think of it as a skip list crossed with a proximity
+    graph. Every vector is a node in layer zero with links to its near neighbors; a random minority of nodes also appear in
+    sparser upper layers whose links span long distances. A query enters at the top, greedily hops to whichever neighbor is
+    closer, and drops a layer whenever it can't improve — long hops first, fine hops last, about log-N total. Three parameters
+    matter: M, the links per node, sets the memory-recall trade-off; efConstruction sets build quality; and efSearch is the
+    runtime knob — widen the search beam and recall approaches exact search at the cost of latency. It gives ninety-five-plus
+    percent recall in milliseconds and supports incremental inserts without retraining, which is why we chose it; the price is
+    that the whole graph lives in RAM and deletes are tombstoned. If the corpus outgrew memory I'd move to quantization or
+    DiskANN and re-validate recall on our eval set."</p>
+  </div>
+
+  <div class="spoken">
+    <div class="tag">Spoken · 30s opener for the whole design</div>
+    <p>"I'd split RAG into an offline ingestion plane and an online query plane joined by three stores — a vector index, a
+    keyword index, and a chunk-metadata store. Offline is throughput-shaped: parse, chunk structure-aware, embed in GPU
+    batches, upsert idempotently. Online is latency-shaped: rewrite and embed the query, hybrid-retrieve fifty candidates from
+    HNSW plus BM25, fuse with reciprocal rank fusion, cross-encoder rerank to eight, and generate with mandatory citations.
+    Retrieval recall caps everything downstream, so an offline eval set with recall-at-k regression gates every change —
+    the same discipline as my benchmark pipeline at Microsoft: verifiable ground truth first, then iterate."</p>
+  </div>
+</section>
+
+<!-- ============ 7. BOTTLENECKS ============ -->
+<section>
+  <h2><span class="num">07</span>Bottlenecks &amp; evolution — name these before they're asked</h2>
+  <div class="cards">
+    <div class="card fn">
+      <h3>What breaks first</h3>
+      <ul>
+        <li><b>Parser quality</b> — one bad PDF pipeline poisons thousands of chunks silently; detect via chunk-quality sampling.</li>
+        <li><b>Embedding model upgrade</b> — full re-embed + side-by-side index swap; never mix vector spaces in one index.</li>
+        <li><b>ACL at scale</b> — post-filtering can return &lt;k results ("filtered-out starvation"); needs filter-aware ANN search.</li>
+        <li><b>Semantic cache staleness</b> — doc updated but cached answer survives; invalidate by source-doc id, keep TTL short.</li>
+        <li><b>HNSW delete debt</b> — heavy churn degrades the graph; schedule compaction/rebuild like any LSM-ish system.</li>
+      </ul>
+    </div>
+    <div class="card nfr">
+      <h3>10× evolution</h3>
+      <ul>
+        <li><b>500 M chunks</b> → shard HNSW by tenant/namespace, or move cold shards to DiskANN; router fans out + merges.</li>
+        <li><b>Quality plateau</b> → fine-tune embeddings on click/feedback pairs; add query classification (navigational vs synthesis).</li>
+        <li><b>Multi-hop questions</b> → agentic retrieval: decompose, retrieve per sub-question, iterate — my HDMAS wide-search
+            experience is exactly this shape.</li>
+        <li><b>Cost pressure</b> → route easy queries to a small model; cache aggressively; the LLM bill dwarfs the retrieval bill.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <b>Numbers to have ready:</b> 50 M chunks · 200 GB fp32 → ~50 GB int8 · ANN ~30 ms · rerank ~120 ms · TTFT ~800 ms ·
+  recall@8 ≥ 90% gate · re-embed ≈ 14 GPU-h — <b>HNSW:</b> M 16–48 · efConstruction 100–400 · efSearch = live recall/latency knob ·
+  O(log N) hops · 95–99% recall.
+</footer>
+
+</div>
+</body>
+</html>

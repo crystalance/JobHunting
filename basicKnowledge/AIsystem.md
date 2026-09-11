@@ -162,3 +162,7 @@
     Their solution has two parts. An **initializer agent** runs once and sets up the environment as external memory: an init script, a progress log, and a feature list in JSON — every feature marked as failing initially. Then a **coding agent** runs each session with a strict protocol: read the git log and progress file, run a smoke test to verify the baseline is healthy, pick exactly one unfinished feature, implement it, verify it **end-to-end like a human user would** — not just unit tests — and only then flip it to passing, commit, and update the progress log. A nice detail: they use JSON instead of Markdown for the feature list because models are less likely to tamper with JSON, and the agent is only allowed to change the `passes` field.
 
     What I like about this is it matches what I built in HDMAS: my blackboard task log is the same idea as their feature list — externalize the plan into shared structured state, and rely on **protocol constraints instead of hoping the LLM behaves**. The takeaway in one line: long-horizon capability doesn't come from bigger context windows; it comes from encoding good engineering habits — incremental work, clean handoffs, verify before you claim done — into the harness itself."
+
+### how to lower hallucination?
+1. using deterministic tools like todos/--> use another loop check if todo is done deterministically, incase that the agent 
+2. write out the intention(todo) 

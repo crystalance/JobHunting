@@ -199,6 +199,112 @@
 
 1. DynamoDB is designed for very high-volume key-based reads/writes with automatic horizontal scaling.
 
+### Distributed cache(like redis)
+
+#### use consistent hashing to shard the data
+
+1. it minimize the number of keys to be remapped when the total number of nodes changes
+
+### rate limiter
+
+#### token bucket algorithm
+
+1. In a token bucket, you usually **remove a token**, not a request.
+
+   For each incoming request:
+
+   1. Refill tokens based on elapsed time, up to bucket capacity.
+   2. Check whether there are enough tokens for this request.
+      - Usually a normal request costs `1` token.
+      - A larger request might cost more (e.g. bytes uploaded).
+   3. If enough tokens exist, decrement that many tokens and let the request proceed.
+   4. If not, either:
+      - **reject/drop** the request (rate limiting), or
+      - **put it in a queue** until tokens become available (traffic shaping).
+
+   So the decision is simply:
+
+   ```java
+   if (tokens >= requestCost) {
+       tokens -= requestCost;  // consume token(s)
+       allowRequest();
+   } else {
+       rejectOrQueueRequest();
+   }
+   ```
+
+   Example: bucket capacity = 10, refill rate = 2 tokens/sec. If it currently has 3 tokens:
+
+   - A normal request costing 1 → accepted; remaining tokens = 2.
+   - A request costing 5 → not enough tokens → reject or wait.
+
+   The request itself is only “removed” from a queue if you use the shaping/queueing version and decide to drop it—for example, the queue is full or it has waited past a timeout.
+
+2. how do we decide the refill rate and bucket capacity then?  say we limit 100 request per second per user?
+
+   1. For a limit of **100 requests/second per user**:
+
+      - **Refill rate** = `100 tokens/second`
+      - **Bucket capacity** = how much short burst you want to allow
+
+      Each request costs 1 token.
+
+      For example:
+
+      | Configuration                  | Meaning                                                      |
+      | ------------------------------ | ------------------------------------------------------------ |
+      | refill = 100/s, capacity = 100 | User can send up to 100 immediately, then sustain 100/s      |
+      | refill = 100/s, capacity = 200 | User can briefly burst to 200 requests, then sustain 100/s   |
+      | refill = 100/s, capacity = 10  | Very little burst allowed; behavior is close to evenly spaced requests |
+
+      A common starting point is:
+
+      ```text
+      refill rate = 100 tokens/sec
+      capacity = 100 tokens
+      ```
+
+      This means the long-term average cannot exceed 100 RPS, while a user who has been idle can make a short burst of up to 100 requests.
+
+      Internally, don’t refill once every second in a timer; calculate it lazily when a request arrives:
+
+      ```text
+      newTokens = elapsedSeconds × 100
+      tokens = min(capacity, tokens + newTokens)
+      ```
+
+      Then consume one token if `tokens >= 1`.
+
+      One subtle point: with capacity 100, a user who was idle can send 100 requests instantly, then after 1 second send another 100. That’s acceptable because the average over a longer period is bounded, but it is a bursty policy. If downstream services cannot tolerate that burst, reduce the capacity—e.g. capacity 20—while keeping the refill rate at 100/s.
+
+#### use ZooKeeper to push configuration if needed imediate change on rules
+
+#### how do we minimize latency
+
+1. *Colocation is key. We want our gateways and Redis instances in the same data center, ideally the same rack, to keep network latency under a millisecond. Cross-region calls would add 50-100ms which is way too much.*
+2. *For global scale, we'll deploy regional clusters. A user in Asia hits the Asia cluster, Europe users hit the Europe cluster, etc. This means rate limits might not be perfectly consistent across regions - a user could potentially get 100 requests in Asia and another 100 in Europe - but the alternative is adding huge latency for cross-region synchronization. For most use cases, this eventual consistency is acceptable.**"*
+
+### Auction Platform like eBay
+
+1. How can we ensure strong consistency for bids?
+   1. which means every user are seeing the same price --> which means 
+   2. A bid is not just “write a row.” You must check and change related state as one indivisible operation:
+      - auction is still open
+      - bid amount is higher than the current highest bid
+      - optionally bidder has sufficient balance / valid authorization
+      - record the bid
+      - update the auction’s current winning bid
+2. Use SSE for real-time update the result of the current higest bid
+   1. Will need a Pub/Sub broker to broadcast the notification 
+   2. ![image-20260908165918657](./classic_problems.assets/image-20260908165918657.png)
+
+### Job scheduler
+
+1. ![image-20260908180321139](./classic_problems.assets/image-20260908180321139.png)
+2. why use dynamoDB here?
+
+
+
 ## default patterns
 
 ### dealing with contention
@@ -267,3 +373,8 @@ The relationship is:
 > The transaction defines the boundary; the pessimistic lock protects specific records during that boundary.
 
 Also, ordinary `UPDATE` statements already acquire database locks. Explicit pessimistic locking is especially useful when you must first read data, make a decision in application code, and then update it safely.
+
+### Managing long running tasks
+
+1. how to deal with the situation where workers shut down?
+   1. we periodically send heartbeats(20-30s) to workers to test if it is alive, if not, we 

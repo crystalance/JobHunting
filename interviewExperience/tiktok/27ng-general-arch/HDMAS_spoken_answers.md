@@ -14,7 +14,9 @@
 >
 > The task shape is many independent lookups plus one merge — that's exactly what parallelism is for. But instead of a planner dispatching workers, HDMAS runs N identical peers with no roles at all. All coordination state lives in one shared blackboard file with an append-only task log, protected by a file lock. Each peer loops: lock the board, re-derive the remaining subtasks, claim exactly one, unlock, go execute with its own tools, then come back and mark it done. Termination is a unanimous vote-stop protocol, with a wake mechanism if someone finds the answer incomplete.
 >
-> Holding the same Copilot backend constant, three agents beat the single agent on 200 WideSearch tasks — Row-F1 up 11.4 percent relative, Item-F1 up 8 — and our numbers were above every multi-agent entry on the public leaderboard."
+> Holding the same Copilot backend constant, three agents beat the single agent on 200 WideSearch tasks — Row-F1 up 11.4 percent relative, Item-F1 up 8 — and our numbers were above every multi-agent entry on the public leaderboard.
+>
+> The architecture-level conclusion is this: it helps when N is small, and it stops scaling when N is large. At three agents you actually buy accuracy — more peers cover more independent sources before anyone converges early. Past that, the lock on the shared blackboard — and especially on the shared answer file — becomes the bottleneck. Extra agents spend their time waiting, not searching. That's exactly what the eight-agent run showed: Item-F1 and Row-F1 barely moved — Item-F1 even ticked up a little because more agents extract more cells — but exact-match got worse, and cost and latency exploded. About two times the wall-clock and 2.7 times the tool calls for no real quality gain. So the headline is: this design wins at small N; the lock is what prevents it from scaling."
 
 ---
 
@@ -85,6 +87,14 @@
 > Then I'd diff task logs case by case between a good run and a bad run. Fewer claims per case means subtask enumeration regressed — likely a model behavior change. Same claims but more 'failed' outcomes means sources became unreachable. I'd also check for agent-crash events, lock timeouts, and early vote-stops.
 >
 > Last, backend drift: the Copilot model behind the agents isn't pinned, so if nothing else explains it, I'd re-run a fixed twenty-case subset to bisect when behavior changed. The general principle is the reason I like the blackboard design: coordination is a file, so the whole run is auditable after the fact — you debug from evidence, not from guesses."
+
+---
+
+## Closing — architecture conclusion (drop this after Q1 / Q3 / Q4)
+
+> "So the conclusion for this architecture is pretty clean. It improves accuracy when the number of agents is small — three beat one, because more peers cover more sources and rescue each other's early stops. But as you add more sub-agents, the lock becomes the main bottleneck and that's what prevents it from scaling. You see it in the results: Item-F1 and Row-F1 barely improve, while cost and latency just explode. That's the main finding we took away from this design."
+
+*(If you have 10 extra seconds, add the mechanism so it doesn't sound like a vibe: "the lock serializes claim-and-commit; execution is parallel, coordination is not — so N times the wait, almost no extra coverage.")*
 
 ---
 

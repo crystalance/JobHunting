@@ -182,6 +182,75 @@ secrets). App secrets (`TELEGRAM_TOKEN`, LLM keys) live in `.env` on the box, gi
 surviving `reset --hard`. Never in the repo, never in CI logs. At team scale: SSM Parameter
 Store / Secrets Manager with instance-role access, so secrets rotate without SSH.
 
+## Sidebar — how GitHub Actions normally handles `.env` (the standard patterns)
+
+**The golden rule**: `.env` is never committed. Git only ever sees `.gitignore`'d absence plus
+maybe a committed `.env.example` with dummy values documenting which keys exist. Everything else
+is about *where the real values live* and *how they reach the runtime*. Four standard patterns,
+in rough order of how often you see them:
+
+**Pattern 1 — GitHub Secrets → env vars at run time (the default).** Store each value as an
+encrypted secret (repo / environment / org level), reference it in the workflow:
+
+```yaml
+- name: Run tests
+  env:
+    DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    API_KEY: ${{ secrets.API_KEY }}
+  run: pytest
+```
+
+No `.env` file ever materializes; the app reads plain env vars (12-factor style — good libraries
+like `python-dotenv` treat `.env` as a *fallback* to real env vars, so the same code works in dev
+and CI). Actions **masks** secret values in logs (prints `***`), never exposes them to workflows
+triggered by fork PRs, and encrypts them at rest. Non-sensitive config uses `${{ vars.X }}`
+(unencrypted, unmasked) — the sensitive/non-sensitive split is deliberate.
+
+**Pattern 2 — synthesize a `.env` file in the workflow.** When the app insists on a real file
+(docker-compose, some frameworks), write it from secrets at build time:
+
+```yaml
+- name: Create .env
+  run: |
+    echo "TELEGRAM_TOKEN=${{ secrets.TELEGRAM_TOKEN }}" >> .env
+    echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> .env
+```
+
+Common shortcut for many keys: store the **entire `.env` base64-encoded as one secret** and
+`echo "${{ secrets.ENV_FILE }}" | base64 -d > .env`. Convenient but weaker: one blob means no
+per-key audit/rotation, and **masking breaks** — GitHub masks the base64 string, not the decoded
+values, so an accidental `cat .env` leaks plaintext into logs. Same caveat for any transformation
+of a secret (substrings, URL-encoding): masking is exact-match, best-effort.
+
+**Pattern 3 — environment-scoped secrets + protection rules.** GitHub "environments" (staging /
+production) each carry their own secret set; the same workflow gets prod keys only when deploying
+to the `production` environment, which can require manual approval and branch restrictions. This
+is how one pipeline handles dev/staging/prod `.env` differences without three workflow files.
+
+**Pattern 4 — don't put app secrets in GitHub at all (what I do, and the mature endgame).**
+Two flavors:
+- **Server-resident `.env`** (my BrowserUseBot): the file lives on the target box, gitignored,
+  surviving `git reset --hard`. CI holds only the SSH key. CI can't leak what it never held.
+- **OIDC → cloud secret manager** (team scale): the workflow exchanges a short-lived OIDC token
+  for cloud credentials (`aws-actions/configure-aws-credentials` with a role, no stored keys),
+  and the app pulls from Secrets Manager / SSM / Vault at startup via instance-role. Zero
+  long-lived secrets in GitHub, central rotation and audit. This is the direction the industry
+  is converging on.
+
+**The spoken 30-second version:** "Standard practice is: `.env` never enters git; GitHub
+encrypted secrets inject values as env vars at run time with log masking, or the workflow
+synthesizes a `.env` from secrets when a file is required; environment-level secrets with
+approval gates separate staging from prod. My bot goes one step further — app secrets never
+touch CI at all, the `.env` lives only on the box and deploys are designed not to disturb it;
+CI holds nothing but an SSH key. At team scale I'd move to OIDC plus a secret manager so there
+are no long-lived credentials anywhere in GitHub."
+
+**Traps an interviewer may poke:** masking is exact-match (derived values leak); `set -x` in a
+shell step can echo secrets; secrets passed as CLI args show up in `ps` on shared runners;
+fork-PR workflows get no secrets (why external contributors' CI "fails on the deploy step" — by
+design); rotating a leaked secret also means scrubbing the git history if it was ever committed
+(`git filter-repo`), because deleting the file in a later commit removes nothing.
+
 **"Rollback rolls back code. What about data/schema?"** → This app has no DB schema, so commit
 rollback is complete. In general: expand-and-contract migrations (add column → dual-write →
 switch reads → drop later), so code N−1 always runs against schema N — rollback stays safe.
@@ -196,3 +265,4 @@ switch reads → drop later), so code N−1 always runs against schema N — rol
 
 **Numbers to have ready:** deploy ≈ 2 min push-to-live (was manual multi-step before) · test gate
 ~30 s · health-check window 5 s · rollback ≈ 1 min · runs 24/7 via systemd auto-restart.
+

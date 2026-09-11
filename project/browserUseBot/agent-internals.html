@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BrowserUseBot — Inside the Agent</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#EDF0F2;
+    --grid:#DFE5EA;
+    --grid2:#CFD8DF;
+    --ink:#1F2D3A;
+    --ink-soft:#5A6B7A;
+    --card:#FFFFFF;
+    --accent:#E8611C;       /* human-in-the-loop */
+    --teal:#1F7A6E;         /* observability */
+    --steel:#5B7A99;        /* outer orchestration / durable state */
+    --aws-tint:#F6F9FB;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Archivo',system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .mono{font-family:'IBM Plex Mono',ui-monospace,monospace}
+  a{color:var(--accent)}
+
+  /* ---------- page header ---------- */
+  header{max-width:1400px;margin:0 auto;padding:44px 20px 8px}
+  .eyebrow{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.22em;
+    text-transform:uppercase;color:var(--accent);font-weight:600}
+  header h1{font-size:34px;font-weight:800;letter-spacing:-.01em;margin:6px 0 8px}
+  header p{max-width:900px;font-size:14px;line-height:1.55;color:var(--ink-soft)}
+
+  /* ---------- drawing board ---------- */
+  .board-scroll{overflow-x:auto;padding:0 20px}
+  .board{
+    position:relative;width:1400px;height:2060px;margin:22px auto 0;
+    background:
+      repeating-linear-gradient(0deg,transparent 0 31px,var(--grid) 31px 32px),
+      repeating-linear-gradient(90deg,transparent 0 31px,var(--grid) 31px 32px),
+      repeating-linear-gradient(0deg,transparent 0 159px,var(--grid2) 159px 160px),
+      repeating-linear-gradient(90deg,transparent 0 159px,var(--grid2) 159px 160px),
+      #F3F5F7;
+    border:2px solid var(--ink);
+  }
+  svg.wires{position:absolute;inset:0;width:1400px;height:2060px;pointer-events:none;z-index:3}
+
+  /* ---------- nodes ---------- */
+  .node{
+    position:absolute;background:var(--card);border:1.5px solid var(--ink);
+    border-radius:3px;padding:10px 12px;z-index:2;
+    box-shadow:3px 3px 0 rgba(31,45,58,.10);
+  }
+  .node h4{font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:600;
+    letter-spacing:.09em;text-transform:uppercase;margin-bottom:5px}
+  .node p{font-size:11px;line-height:1.42;color:var(--ink-soft)}
+  .node p b{color:var(--ink);font-weight:600}
+  .node.accent-edge{border-color:var(--accent);box-shadow:3px 3px 0 rgba(232,97,28,.16)}
+  .node.accent-edge h4{color:var(--accent)}
+  .node.teal-edge{border-color:var(--teal);box-shadow:3px 3px 0 rgba(31,122,110,.14)}
+  .node.teal-edge h4{color:var(--teal)}
+  .node.steel-edge{border-color:var(--steel);box-shadow:3px 3px 0 rgba(91,122,153,.16)}
+  .node.steel-edge h4{color:var(--steel)}
+  .chip{padding:7px 9px}
+  .chip h4{margin-bottom:2px;font-size:9.5px}
+  .chip p{font-size:9.5px;line-height:1.3}
+
+  /* step number inside loop nodes */
+  .stepno{font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:600;
+    color:var(--accent);letter-spacing:.14em;display:block;margin-bottom:2px}
+
+  /* tool rows */
+  .trow{display:flex;gap:8px;margin-bottom:7px;align-items:baseline}
+  .trow:last-child{margin-bottom:0}
+  .trow .tn{font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:600;
+    color:var(--ink);white-space:nowrap;flex:none}
+  .trow .tn.accent{color:var(--accent)}
+  .trow .td{font-size:10px;line-height:1.35;color:var(--ink-soft)}
+
+  /* ---------- zones ---------- */
+  .zone{position:absolute;border:1.5px dashed rgba(31,45,58,.45);border-radius:4px;z-index:1}
+  .zone>.zlabel{
+    position:absolute;top:-9px;left:12px;background:#F3F5F7;padding:0 7px;
+    font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:600;
+    letter-spacing:.14em;text-transform:uppercase;color:var(--ink)}
+  .zone.solid{border-style:solid;border-width:2px;background:var(--aws-tint)}
+  .zone.solid>.zlabel{background:var(--aws-tint);font-size:11.5px}
+  .zone.steelz{border-color:rgba(91,122,153,.7)}
+  .zone.steelz>.zlabel{color:var(--steel)}
+
+  /* ---------- wire labels ---------- */
+  .wl{position:absolute;z-index:4;font-family:'IBM Plex Mono',monospace;font-size:9px;
+    font-weight:500;letter-spacing:.04em;color:var(--ink-soft);background:#F3F5F7;
+    padding:1px 4px;border-radius:2px;white-space:nowrap}
+  .wl.accent{color:var(--accent);font-weight:600}
+  .wl.steel{color:var(--steel)}
+  .wl.teal{color:var(--teal)}
+  .wl.multi{white-space:normal;line-height:1.45;background:transparent}
+
+  /* ---------- legend ---------- */
+  .legend{position:absolute;left:880px;top:40px;width:490px;z-index:2;
+    background:var(--card);border:1.5px solid var(--ink);border-radius:3px;padding:10px 14px;
+    box-shadow:3px 3px 0 rgba(31,45,58,.10)}
+  .legend h4{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.12em;
+    text-transform:uppercase;margin-bottom:8px}
+  .legend .row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+  .legend .row:last-child{margin-bottom:0}
+  .legend .sw{width:26px;height:0;border-top:2.5px solid var(--ink);flex:none}
+  .legend .sw.accent{border-color:var(--accent)}
+  .legend .sw.steel{border-color:var(--steel);border-top-style:dashed}
+  .legend span{font-size:11px;color:var(--ink-soft)}
+
+  /* ---------- memory cells ---------- */
+  .cell{position:absolute;width:205px;height:240px;background:var(--card);
+    border:1.5px solid var(--ink);border-radius:3px;padding:10px 11px;z-index:2;
+    box-shadow:3px 3px 0 rgba(31,45,58,.10)}
+  .cell .lv{font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:600;
+    letter-spacing:.14em;color:var(--steel);display:block;margin-bottom:3px}
+  .cell h4{font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:600;
+    letter-spacing:.07em;text-transform:uppercase;margin-bottom:6px}
+  .cell p{font-size:10.5px;line-height:1.45;color:var(--ink-soft)}
+  .cell p b{color:var(--ink);font-weight:600}
+
+  /* ---------- title block ---------- */
+  .titleblock{
+    position:absolute;left:1040px;top:1920px;width:330px;z-index:2;
+    background:var(--card);border:1.5px solid var(--ink)}
+  .titleblock .tb-row{display:flex;border-bottom:1px solid rgba(31,45,58,.25)}
+  .titleblock .tb-row:last-child{border-bottom:none}
+  .titleblock .tb-k{width:88px;flex:none;padding:5px 8px;font-family:'IBM Plex Mono',monospace;
+    font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);
+    border-right:1px solid rgba(31,45,58,.25)}
+  .titleblock .tb-v{padding:5px 8px;font-size:10.5px;font-weight:600}
+
+  /* ---------- annotations ---------- */
+  .notes{max-width:1400px;margin:30px auto 0;padding:0 20px;
+    display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+  .note{background:var(--card);border:1.5px solid var(--ink);border-radius:3px;padding:16px;
+    box-shadow:3px 3px 0 rgba(31,45,58,.10)}
+  .note h3{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.1em;
+    text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+  .note h3 .sw{width:20px;height:0;border-top:2.5px solid var(--ink);flex:none}
+  .note.accent h3{color:var(--accent)} .note.accent h3 .sw{border-color:var(--accent)}
+  .note.teal h3{color:var(--teal)} .note.teal h3 .sw{border-color:var(--teal);border-top-style:dashed}
+  .note.steel h3{color:var(--steel)} .note.steel h3 .sw{border-color:var(--steel);border-top-style:dashed}
+  .note p,.note li{font-size:12px;line-height:1.55;color:var(--ink-soft)}
+  .note b{color:var(--ink);font-weight:600}
+  .note .kbd{font-family:'IBM Plex Mono',monospace;font-size:10.5px;background:var(--paper);
+    padding:1px 4px;border-radius:2px;color:var(--ink)}
+
+  /* ---------- facts ---------- */
+  .facts{max-width:1400px;margin:16px auto 60px;padding:0 20px}
+  .facts-inner{border:1.5px solid var(--ink);border-radius:3px;background:var(--card);
+    display:grid;grid-template-columns:repeat(6,1fr);box-shadow:3px 3px 0 rgba(31,45,58,.10)}
+  .fact{padding:12px 14px;border-right:1px solid rgba(31,45,58,.18)}
+  .fact:last-child{border-right:none}
+  .fact .k{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--ink-soft);margin-bottom:4px}
+  .fact .v{font-size:12px;font-weight:600;line-height:1.4}
+
+  @media (max-width:1100px){
+    .notes{grid-template-columns:repeat(2,1fr)}
+    .facts-inner{grid-template-columns:repeat(3,1fr)}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">System schematic · sheet A-02 · companion to <a href="architecture-graph.html">A-01 system architecture</a></div>
+  <h1>BrowserUseBot — Inside the Agent</h1>
+  <p>How the browser-use engine actually runs a task, and what the harness adds around it:
+     the perceive→decide→act step loop, a two-tier tool registry where reliability lives in
+     code instead of prompts, and a layered memory design that keeps the context window flat
+     while the durable state (dedup ledger, collected records, cookies) lives on disk.</p>
+</header>
+
+<div class="board-scroll">
+<div class="board">
+
+  <!-- ================= RUNNER STRIP ================= -->
+  <div class="node" style="left:30px;top:40px;width:820px;height:106px">
+    <h4>BrowserAgentRunner — the harness entry point</h4>
+    <p><span class="mono">run_task(goal, policy)</span> / <span class="mono">run_harvest(spec)</span> → <span class="mono">Result</span>.
+       Per run it assembles: a fresh <b>Handoff(policy)</b> ·
+       <b>build_tools(store, ledger, handoff)</b> · a <b>BrowserSession</b> on the persistent
+       profile · the LLM wrapped in a <b>Langfuse tracing proxy</b>. Requests arrive here from
+       the intent router (sheet A-01); everything below is one task's lifetime.</p>
+  </div>
+
+  <div class="legend">
+    <h4>Wire legend</h4>
+    <div class="row"><span class="sw"></span><span>Step dataflow (browser-use engine, reused unforked)</span></div>
+    <div class="row"><span class="sw accent"></span><span>Human-in-the-loop seam (per-step hook + request_login)</span></div>
+    <div class="row"><span class="sw steel"></span><span>Outer orchestration &amp; durable state (harness code)</span></div>
+  </div>
+
+  <!-- ================= AGENT LOOP ================= -->
+  <div class="zone solid" style="left:30px;top:190px;width:820px;height:650px">
+    <span class="zlabel">The agent loop · one step (browser-use)</span>
+  </div>
+
+  <div class="node" style="left:60px;top:250px;width:230px;height:120px">
+    <h4><span class="stepno">01</span>Perceive</h4>
+    <p>Browser state summary: an <b>indexed DOM tree</b> — every clickable becomes
+       <span class="mono">[N]</span> the LLM can reference. URL, tabs, page info.
+       Screenshot only when vision is on (harness skips capture otherwise).</p>
+  </div>
+  <div class="node" style="left:325px;top:250px;width:230px;height:120px">
+    <h4><span class="stepno">02</span>Assemble</h4>
+    <p><b>MessageManager</b> builds the prompt: system + task brief + step history +
+       fresh state, compacted to fit the window. Bulky tool results are included
+       <b>only once</b>, then dropped.</p>
+  </div>
+  <div class="node" style="left:590px;top:250px;width:230px;height:120px">
+    <h4><span class="stepno">03</span>Decide</h4>
+    <p><b>One structured LLM call</b> returns reflection and a batch of actions
+       together — no separate planner. Several actions can run per step.</p>
+  </div>
+  <div class="node" style="left:590px;top:520px;width:230px;height:120px">
+    <h4><span class="stepno">04</span>Act</h4>
+    <p>The <b>Tools registry</b> validates each action (pydantic), dispatches browser
+       events → CDP commands. Harness tools run here too, right beside the defaults.</p>
+  </div>
+  <div class="node" style="left:325px;top:520px;width:230px;height:120px">
+    <h4><span class="stepno">05</span>Record</h4>
+    <p><span class="mono">ActionResult</span> + state → <b>AgentHistory</b>; tokens &amp;
+       latency logged as a Langfuse generation; the step lands in the replay transcript.</p>
+  </div>
+  <div class="node" style="left:60px;top:520px;width:230px;height:120px">
+    <h4><span class="stepno">06</span>Loop gate</h4>
+    <p>Exit on the <span class="mono">done</span> action, the step budget
+       (<b>40</b> per task / <b>25</b> per chunk), or <span class="mono">stop()</span>.
+       Otherwise: next step.</p>
+  </div>
+
+  <div class="node chip accent-edge" style="left:60px;top:415px;width:230px;height:70px">
+    <h4>on_step_start hook</h4>
+    <p>Runs BEFORE every step: policy allow-list check + login-wall detection.
+       The one seam the harness needed — no fork. Internals ↓ bottom-right.</p>
+  </div>
+
+  <div class="node chip" style="left:325px;top:398px;width:230px;height:94px">
+    <h4>AgentOutput — every step</h4>
+    <p class="mono" style="font-size:9.5px;line-height:1.5">{ thinking,<br>
+       &nbsp;&nbsp;evaluation_previous_goal,<br>
+       &nbsp;&nbsp;memory, next_goal,<br>
+       &nbsp;&nbsp;action: [ … ] }</p>
+  </div>
+
+  <!-- ================= TOOLS REGISTRY ================= -->
+  <div class="zone solid" style="left:880px;top:190px;width:490px;height:650px">
+    <span class="zlabel">Tools registry — the action space</span>
+  </div>
+
+  <div class="node" style="left:895px;top:225px;width:460px;height:96px">
+    <h4>browser-use defaults</h4>
+    <p class="mono" style="font-size:10px">navigate · click_element_by_index ·
+       input_text · scroll · switch_tab · extract_structured_data · done …</p>
+    <p style="margin-top:4px">One LLM round-trip per element action — fine for
+       navigation and forms, wasteful for list pages.</p>
+  </div>
+
+  <div class="node" style="left:895px;top:336px;width:460px;height:380px">
+    <h4>Harness tools — CodeAct + guarantees</h4>
+    <div style="margin-top:6px">
+      <div class="trow"><span class="tn">run_js</span><span class="td">agent writes one JS IIFE at runtime; bulk DOM work (all cards on a page) in a single call</span></div>
+      <div class="trow"><span class="tn">extract_and_save</span><span class="td">JS returns record(s) → persisted straight to the store; atomic, deduped by note-id, nothing re-typed</span></div>
+      <div class="trow"><span class="tn">discover_candidates</span><span class="td">JS returns {title, href}[] → queued in the durable ledger (full xsec_token URLs)</span></div>
+      <div class="trow"><span class="tn">open_search</span><span class="td">navigates straight to the results-page URL — never fights the on-page search box</span></div>
+      <div class="trow"><span class="tn">open_next_post</span><span class="td">harness picks and opens the next queued URL; the model never types or guesses one</span></div>
+      <div class="trow"><span class="tn">save_items / save_candidates</span><span class="td">JSON-array fallbacks; a <span class="mono">__FROM_RUN_JS__</span> sentinel is backfilled from the last run_js result so placeholders can't corrupt data</span></div>
+      <div class="trow"><span class="tn accent">request_login</span><span class="td">the LLM judges a login wall is blocking it → human handoff, resumes on the authenticated page</span></div>
+    </div>
+  </div>
+
+  <div class="node" style="left:895px;top:730px;width:460px;height:92px">
+    <h4>How they bind</h4>
+    <p>Each tool's <b>pydantic param model</b> becomes a JSON schema auto-published to
+       the LLM; the description steers when to use it. <b>Prompts request, tools
+       guarantee</b> — dedup, queue, real URLs, and login live in code the model
+       cannot corrupt.</p>
+  </div>
+
+  <!-- ================= BROWSER SUBSTRATE ================= -->
+  <div class="node" style="left:30px;top:880px;width:440px;height:170px">
+    <h4>BrowserSession + CDP (browser-use)</h4>
+    <p>Event-driven session with <b>watchdogs</b> (crash · screenshot · security ·
+       downloads) and the actor layer (Page / Element / Mouse). Builds the indexed
+       DOM the loop perceives. <b>Persistent user-data-dir profile</b> keeps cookies;
+       <span class="mono">keep_alive=True</span> lets ONE warm browser serve many
+       Agent runs — the chunk loop reuses it.</p>
+  </div>
+  <div class="node" style="left:500px;top:880px;width:350px;height:170px">
+    <h4>Harness shims — hard-won fixes</h4>
+    <p class="mono" style="font-size:10px;line-height:1.7">--no-sandbox on Linux (userns blocked)<br>
+       launch timeouts 30s → 90s (cold start)<br>
+       stale SingletonLock cleanup pre-run<br>
+       DISPLAY :99 default for headful Xvfb<br>
+       screenshot capture skipped when vision off</p>
+  </div>
+
+  <!-- ================= MEMORY BAND ================= -->
+  <div class="zone" style="left:30px;top:1080px;width:1340px;height:330px">
+    <span class="zlabel">Memory — layered; durable state lives outside the context window</span>
+  </div>
+
+  <div class="cell" style="left:50px;top:1130px">
+    <span class="lv">L0 · IN-CONTEXT</span>
+    <h4>Working memory</h4>
+    <p><span class="mono">AgentOutput.memory</span> + <span class="mono">next_goal</span> —
+       a scratchpad the model rewrites every step. Cheapest, most volatile layer.</p>
+  </div>
+  <div class="cell" style="left:270px;top:1130px">
+    <span class="lv">L1 · IN-CONTEXT</span>
+    <h4>Step history</h4>
+    <p>MessageManager carries prior steps and <b>compacts</b> to fit the window.
+       Big tool outputs are shown <b>once</b>
+       (<span class="mono">include_extracted_content_only_once</span>) then dropped.</p>
+  </div>
+  <div class="cell" style="left:490px;top:1130px">
+    <span class="lv">L2 · CONTEXT BOUNDARY</span>
+    <h4>Chunk reset</h4>
+    <p>BatchCrawl <b>discards the context every ~25 steps</b>. The fresh agent gets a
+       counts-only brief (<span class="mono">saved 37/60 · pending 12</span>) — never
+       the item list. Context stays flat at any crawl size.</p>
+  </div>
+  <div class="cell" style="left:710px;top:1130px">
+    <span class="lv">L3 · ON DISK</span>
+    <h4>Collected store</h4>
+    <p>Append-only <span class="mono">raw.jsonl</span> of full records (whole 正文
+       body, exact URLs). Read later by the synthesizer — it never re-enters the
+       agent loop.</p>
+  </div>
+  <div class="cell" style="left:930px;top:1130px">
+    <span class="lv">L4 · ON DISK · DURABLE</span>
+    <h4>Visited ledger</h4>
+    <p>SQLite per company/scope: <b>visited</b> (dedup + resume) and
+       <b>candidates</b> (URL queue). Dedup enforced <b>in code, not prompt</b> —
+       hundreds of posts, zero context growth.</p>
+  </div>
+  <div class="cell" style="left:1150px;top:1130px">
+    <span class="lv">L5 · CROSS-RUN</span>
+    <h4>Profile · skills · replay</h4>
+    <p>Cookies persist → logins are rare. Markdown <b>skills</b> = procedural memory
+       prepended to matching tasks. Transcripts (full history JSON) + RunStore
+       records for replay and metrics.</p>
+  </div>
+
+  <div class="wl" style="left:50px;top:1388px">EPHEMERAL · per step</div>
+  <div class="wl" style="left:1190px;top:1388px">DURABLE · survives restarts</div>
+
+  <!-- ================= BATCHCRAWL OUTER LOOP ================= -->
+  <div class="zone steelz" style="left:30px;top:1470px;width:680px;height:430px">
+    <span class="zlabel">BatchCrawl — the outer loop (code, not prompt)</span>
+  </div>
+
+  <div class="node chip steel-edge" style="left:50px;top:1530px;width:112px;height:86px">
+    <h4>1 · Brief</h4>
+    <p>build_chunk_brief — counts-only prompt</p>
+  </div>
+  <div class="node chip steel-edge" style="left:178px;top:1530px;width:112px;height:86px">
+    <h4>2 · Fresh agent</h4>
+    <p>new context · ≤25 steps · shared warm browser</p>
+  </div>
+  <div class="node chip steel-edge" style="left:306px;top:1530px;width:112px;height:86px">
+    <h4>3 · Work</h4>
+    <p>search → discover → open_next → extract_and_save</p>
+  </div>
+  <div class="node chip steel-edge" style="left:434px;top:1530px;width:112px;height:86px">
+    <h4>4 · Trace</h4>
+    <p>one Langfuse trace per chunk; session groups them</p>
+  </div>
+  <div class="node chip steel-edge" style="left:562px;top:1530px;width:112px;height:86px">
+    <h4>5 · Gate</h4>
+    <p>target hit · 2 stalls · queue empty · ≤20 chunks</p>
+  </div>
+
+  <div class="node" style="left:50px;top:1680px;width:630px;height:90px">
+    <h4>Phase 2 — synthesis (browser-less)</h4>
+    <p>After the loop: <span class="mono">save_company_md</span> organizes the records into
+       <b>面经.md</b>; for one-off tasks <span class="mono">synthesize()</span> writes the
+       final answer from <span class="mono">raw.jsonl</span> — grounded only in collected
+       records, links kept exactly. Gathering and answering are separate phases.</p>
+  </div>
+
+  <div class="wl multi" style="left:50px;top:1790px;width:630px;font-size:10px;color:var(--ink-soft)">
+    <b style="color:var(--ink)">Integration:</b> BatchCrawl is NOT a fork of browser-use. It is the same
+    <span class="mono">Agent</span> class given (a) a task brief, (b) extra tools wired to the
+    ledger + store, and (c) this outer while-loop. The engine never changed — that's why new
+    capabilities stay cheap.
+  </div>
+
+  <!-- ================= HANDOFF + OBSERVABILITY ================= -->
+  <div class="node accent-edge" style="left:740px;top:1510px;width:630px;height:180px">
+    <h4>Login handoff — internals</h4>
+    <p><b>Belt:</b> the hook checks URL markers (<span class="mono">login/signin/sso…</span>)
+       plus a universal DOM heuristic — a password field, or a <b>visible modal</b> whose text
+       matches login keywords in 9 languages. <b>Braces:</b> the
+       <span class="mono">request_login</span> tool lets the LLM hand off anything the
+       heuristic misses. Pausing = awaiting an <span class="mono">asyncio.Event</span>
+       between steps (browser stays alive, no busy loop); <span class="mono">/done</span>
+       sets it and the same step resumes on the authenticated page. Allow-list breach →
+       <span class="mono">agent.stop()</span>. One auto-handoff per task; agent-requested
+       ones are always allowed.</p>
+  </div>
+
+  <div class="node teal-edge" style="left:740px;top:1720px;width:630px;height:170px">
+    <h4>Observability — per LLM call, not per run</h4>
+    <p>A <span class="mono">_TracedLLM</span> proxy wraps <span class="mono">ainvoke</span>:
+       every call becomes a Langfuse <b>generation</b> (model, last messages, tokens, latency,
+       errors) — the router, every agent step, and the synthesizer are all visible separately.
+       Trace id = <span class="mono">request_id</span> → deterministic deep link; chunks share
+       a session id. Best-effort by design: a tracing failure can never break a task.
+       Transcripts dump the full AgentHistory JSON for offline replay.</p>
+  </div>
+
+  <!-- ================= TITLE BLOCK ================= -->
+  <div class="titleblock">
+    <div class="tb-row"><div class="tb-k">Project</div><div class="tb-v">BrowserUseBot — inside the agent</div></div>
+    <div class="tb-row"><div class="tb-k">Sheet</div><div class="tb-v">A-02 · Agent loop · tools · memory</div></div>
+    <div class="tb-row"><div class="tb-k">Rev / date</div><div class="tb-v">v0.1 · 2026-09-06</div></div>
+    <div class="tb-row"><div class="tb-k">Sources</div><div class="tb-v mono" style="font-size:9px;font-weight:500">runner.py · tools.py · handoff.py · ledger.py · harvest.py · observability.py · synthesizer.py · skills.py</div></div>
+  </div>
+
+  <!-- ================= WIRES ================= -->
+  <svg class="wires" viewBox="0 0 1400 2060">
+    <defs>
+      <marker id="m-ink" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#1F2D3A"/>
+      </marker>
+      <marker id="m-accent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#E8611C"/>
+      </marker>
+      <marker id="m-steel" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#5B7A99"/>
+      </marker>
+    </defs>
+
+    <g stroke="#1F2D3A" stroke-width="2" fill="none">
+      <!-- runner → loop -->
+      <path d="M440,146 V186" marker-end="url(#m-ink)"/>
+      <!-- ring -->
+      <path d="M290,310 H321" marker-end="url(#m-ink)"/>
+      <path d="M555,310 H586" marker-end="url(#m-ink)"/>
+      <path d="M705,370 V516" marker-end="url(#m-ink)"/>
+      <path d="M590,580 H559" marker-end="url(#m-ink)"/>
+      <path d="M325,580 H294" marker-end="url(#m-ink)"/>
+      <!-- act → tools -->
+      <path d="M820,580 H876" marker-end="url(#m-ink)"/>
+      <!-- substrate → loop -->
+      <path d="M250,880 V846" marker-end="url(#m-ink)"/>
+      <!-- ephemeral → durable -->
+      <path d="M195,1394 H1180" stroke-width="1.5" marker-end="url(#m-ink)"/>
+    </g>
+
+    <!-- human-in-the-loop seam -->
+    <g stroke="#E8611C" stroke-width="2.5" fill="none">
+      <path d="M175,520 V489" marker-end="url(#m-accent)"/>
+      <path d="M175,415 V374" marker-end="url(#m-accent)"/>
+    </g>
+
+    <!-- outer orchestration / durable state -->
+    <g stroke="#5B7A99" stroke-width="2" fill="none" stroke-dasharray="7 4">
+      <!-- tools → memory band -->
+      <path d="M1125,840 V1076" marker-end="url(#m-steel)"/>
+      <!-- batchcrawl chips -->
+      <path d="M162,1573 H174" marker-end="url(#m-steel)"/>
+      <path d="M290,1573 H302" marker-end="url(#m-steel)"/>
+      <path d="M418,1573 H430" marker-end="url(#m-steel)"/>
+      <path d="M546,1573 H558" marker-end="url(#m-steel)"/>
+      <!-- loop back -->
+      <path d="M600,1616 V1650 H106 V1622" marker-end="url(#m-steel)"/>
+      <!-- stop → synthesis -->
+      <path d="M645,1616 V1676" marker-end="url(#m-steel)"/>
+      <!-- batchcrawl ↔ memory band -->
+      <path d="M370,1466 V1416" marker-end="url(#m-steel)"/>
+    </g>
+  </svg>
+
+  <!-- ================= WIRE LABELS ================= -->
+  <div class="wl" style="left:712px;top:430px">actions[]</div>
+  <div class="wl" style="left:824px;top:562px">dispatch</div>
+  <div class="wl" style="left:260px;top:854px">DOM state · events (CDP)</div>
+  <div class="wl steel" style="left:1132px;top:940px">writes: records → store · links → ledger</div>
+  <div class="wl steel" style="left:380px;top:1430px">SQLite + JSONL</div>
+  <div class="wl steel" style="left:200px;top:1636px">next chunk (fresh context)</div>
+  <div class="wl steel" style="left:652px;top:1642px">stop →</div>
+  <div class="wl accent" style="left:186px;top:494px">every step</div>
+
+</div>
+</div>
+
+<!-- ================= ANNOTATIONS ================= -->
+<section class="notes">
+  <div class="note">
+    <h3><span class="sw"></span>One step, end to end</h3>
+    <p>Each step: read the page as an <b>indexed DOM tree</b> (element
+       <span class="kbd">[23]</span> = that button — no pixel guessing), assemble a bounded
+       prompt, make <b>one structured LLM call</b> that returns reflection
+       (thinking · evaluation · memory · next_goal) <b>and</b> a batch of actions, execute
+       them through the registry, record everything. The <span class="kbd">done</span>
+       action or the step budget ends the run. The per-step hook is the only seam the
+       harness adds — browser-use is reused, never forked.</p>
+  </div>
+
+  <div class="note">
+    <h3><span class="sw"></span>Tools: prompts request, code guarantees</h3>
+    <p>The CodeAct move: <span class="kbd">run_js</span> collapses N element-actions into
+       one snippet — a whole results page is harvested in a single LLM round-trip.
+       The paired <span class="kbd">extract_and_save</span> / <span class="kbd">discover_candidates</span>
+       make extraction <b>atomic</b>: the JS result is persisted by the harness, so the model
+       can't lose data re-typing it (and the <span class="kbd">__FROM_RUN_JS__</span> sentinel
+       backfill catches even lazy placeholders). Everything reliability-critical — dedup,
+       queue, real URLs, login — is a <b>tool</b>, not an instruction the model can drift from.</p>
+  </div>
+
+  <div class="note steel">
+    <h3><span class="sw"></span>Memory: the context window is a cache</h3>
+    <p>Treat the LLM context as L0/L1 of a memory hierarchy; everything that must
+       survive lives in <b>SQLite, JSONL, and the browser profile</b>. The chunk reset (L2)
+       is the trick that makes 300-post crawls possible: the model only ever sees
+       <b>counts</b> (<span class="kbd">saved 37/60 · pending 12</span>), and the harness
+       serves the next URL from the ledger. Dedup is a database constraint, not a plea in
+       the prompt — so it cannot be hallucinated away.</p>
+  </div>
+
+  <div class="note accent">
+    <h3><span class="sw"></span>The outer loop + handoff</h3>
+    <p>BatchCrawl loops: counts-only brief → fresh agent (≤25 steps) on the same warm
+       browser → gate (target reached, two no-progress chunks, empty queue, or 20-chunk
+       ceiling) → Phase-2 synthesis. Login walls pause the loop from inside a step: a DOM
+       heuristic or the model's own <span class="kbd">request_login</span> call parks the
+       agent on an <span class="kbd">asyncio.Event</span> until you finish logging in and
+       send <span class="kbd">/done</span> — then the very same step continues,
+       authenticated, cookies saved for next time.</p>
+  </div>
+</section>
+
+<!-- ================= FACTS ================= -->
+<div class="facts">
+  <div class="facts-inner">
+    <div class="fact"><div class="k">Engine</div><div class="v">browser-use, wrapped — unforked</div></div>
+    <div class="fact"><div class="k">Step budget</div><div class="v">40 / task · 25 / chunk</div></div>
+    <div class="fact"><div class="k">Vision</div><div class="v">off by default (capture skipped)</div></div>
+    <div class="fact"><div class="k">Custom tools</div><div class="v">8 CodeAct + collection</div></div>
+    <div class="fact"><div class="k">Ledger</div><div class="v">SQLite per company / scope</div></div>
+    <div class="fact"><div class="k">Tracing</div><div class="v">1 trace / chunk · session / task</div></div>
+  </div>
+</div>
+
+</body>
+</html>

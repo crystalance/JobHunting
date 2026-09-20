@@ -11,7 +11,7 @@
 
 
 ### bitly(shorten URL)
-1. use a compact encoding like base64 to shorten uuid while keep its uniqueness
+1. use a compact encoding like base62 to shorten uuid while keep its uniqueness
 2. cache first, database second on a miss
 3. how to scale out the system to serve 10k QPS? (scale out reading)
     1. use CDN to store the hot keys
@@ -43,7 +43,9 @@
 2. Location-based search endpoints can return a large number of results, so always add pagination support using limit and offset query parameters. This keeps response sizes manageable and prevents overloading both the server and the client.
 
 ### design ticket master
-1. how do you deal with the 
+#### need a distributed lock(in redis) for users to complete the transaction
+
+1. 
 
 
 ### design Instagram
@@ -55,6 +57,7 @@
         1. Normal account with 200 followers: fan-out on write; insert the post into those 200 feed inboxes.(--> which is a precomputed cache, like in redis, its a sorted set, with the time as value to be sort)
         2. Celebrity with 10M followers: fan-out on read; keep the post in the celebrity’s own timeline/cache.
         3. When a user reads their feed: merge “pushed” posts from normal accounts with “pulled” posts from celebrity accounts.
+   3. 发帖先把 Post 落库（媒体走 S3，处理完再 ready），再 入队 fan-out：普通用户把 postId 写入每人一份的 Feed 表（这才是预计算 inbox），名人跳过、读时再 merge；Redis 只缓存帖子正文（读 feed 时按 id 去 Post 表回填），不要在 fan-out 里和 Feed 表对等双写时间线。读路径是 Feed 表取 id → Redis hydrate，miss 才打 Post 表。图上的问题就是把 Redis 画成了预计算 feed、fan-out 指到 Post 库、队列方向反了——预计算在 Feed 表，缓存是派生数据，挂了从 Feed/Post 表补，不要把帖标失败。
 
 ### Tinder
 #### Non-funcitional requirements
@@ -199,6 +202,11 @@
 
 1. DynamoDB is designed for very high-volume key-based reads/writes with automatic horizontal scaling.
 
+#### What happens if the web socket connection fails?
+
+1. Application-level heartbeats
+   1. from chat server to user, if user failed to response, close the connection to save the resource
+
 ### Distributed cache(like redis)
 
 #### use consistent hashing to shard the data
@@ -303,7 +311,12 @@
 1. ![image-20260908180321139](./classic_problems.assets/image-20260908180321139.png)
 2. why use dynamoDB here?
 
+### Design Chatgpt
 
+1. SSE is good for having a low TTFT(time to first token), but it requires long connections from service to users-end. So naive design cant tolerate fault either from server or user client, or the network.
+2. Reconnect — Wi‑Fi blip, laptop sleep, nginx 60s timeout, user refreshes. The old SSE is dead. A new request hits pod B, which never saw the first tokens. B does `XREAD run:{id} from lastSeq` and continues the stream. Without Redis, those tokens only lived in pod A’s memory → user sees a broken sentence or a duplicate full regenerate.
+   1. so the solution would be a Redis Stream, so the inference serive would add, which is append the generated tokens to this redis stream log, with a uniqueId for that chat, and for any service want to read that chat,  it just needs to read from last sequence number to catch up.
+3. ![image-20260911181234516](./classic_problems.assets/image-20260911181234516.png)
 
 ## default patterns
 
@@ -377,4 +390,133 @@ Also, ordinary `UPDATE` statements already acquire database locks. Explicit pess
 ### Managing long running tasks
 
 1. how to deal with the situation where workers shut down?
-   1. we periodically send heartbeats(20-30s) to workers to test if it is alive, if not, we 
+   1. we periodically send heartbeats(10s) to workers to test if it is alive, if not, we consider the worker is crashed, and reenque the job
+2. how to prevent duplicated work
+   1. if a user managed to send the same request multiple times in a short period of time:
+      1. use a uniquekey: like userId+action+ timestamp(for example: 1minute)
+      2. 
+
+
+### Realtime Leaderboard
+
+1. Availability > consistency 
+   1. can use redis sorted set
+2. how do we consider realtime?
+   1. we can use periodically polling for updates, to trade-off real-time for simplicity
+
+### how can we get consistency?
+
+1. The typical scenario is: **multiple requests concurrently try to change the same logical resource, and the final result must obey an invariant.**
+
+   Examples:
+
+   | Resource            | Concurrent requests           | Invariant                                     |
+   | ------------------- | ----------------------------- | --------------------------------------------- |
+   | Auction `A123`      | Many users place bids         | Highest valid bid wins; price never decreases |
+   | Seat `S8`           | Many users try to buy it      | At most one confirmed owner                   |
+   | Bank balance        | Two payments arrive           | Balance must not go below zero                |
+   | Username            | Many users register `alice`   | Only one account owns it                      |
+   | Tinder pair `(A,B)` | Both users swipe concurrently | Create at most one mutual match               |
+
+   The first design question is: **what is the unit of contention?**
+   Not “the entire database,” but usually one seat, one auction, one user-pair, or one account.
+
+   Then choose a strategy.
+
+   | Strategy                               | How it works                                                 | Best when                                            |
+   | -------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------- |
+   | Conditional write / optimistic locking | Update succeeds only if the version/state you read is still current; otherwise retry or reject | Conflicts are relatively uncommon                    |
+   | Row lock / serializable transaction    | Lock the resource while validating and updating it           | Logic needs multiple reads/writes together           |
+   | Single owner / sequencer               | Route all commands for one resource to one partition/consumer, which processes them in order | One resource is very hot                             |
+   | Unique constraint                      | Let the DB enforce “only one”                                | Duplicate ownership/creation                         |
+   | Distributed lock                       | Acquire an external lock before processing                   | Usually avoid unless DB cannot express the invariant |
+
+   For example, selling one seat:
+
+   ```sql
+   UPDATE seats
+   SET status = 'HELD', hold_owner = :userId
+   WHERE seat_id = :seatId
+     AND status = 'AVAILABLE';
+   ```
+
+   If one request changes the row first, every other concurrent request updates `0` rows and gets “seat is no longer available.” That is a simple conditional write—no explicit lock service required.
+
+   For a popular auction, optimistic locking can cause too many retries:
+
+   ```text
+   1,000 bids → all read bid = $100
+   → only one can update to version 51
+   → 999 fail, reread, and retry
+   ```
+
+   Then route all bids for the same `auctionId` to one sequencer/queue partition:
+
+   ```text
+   auctionId = 123 → one ordered consumer
+   ```
+
+   That consumer evaluates `$101`, `$105`, `$103` in a single order and updates durable state. Different auctions can still be handled in parallel.
+
+   The rule of thumb:
+
+   ```text
+   Low contention → conditional update / optimistic lock
+   Moderate contention + multi-step invariant → DB transaction / row lock
+   High contention on one key → partition by that key and serialize commands
+   ```
+
+   In all cases, the authority must be durable and strongly consistent for that resource. Redis may help route, cache, or rate-limit, but should not be the only source of truth for a payment, seat ownership, or auction winner.
+
+## normal trade-off patterns for system design
+
+1. Most system-design decisions are variations of a small set of trade-offs. In an interview, state: **requirement → cost → chosen trade-off**.
+
+   | Trade-off                              | Choose left when                                           | Choose right when                                            |
+   | -------------------------------------- | ---------------------------------------------------------- | ------------------------------------------------------------ |
+   | Consistency vs availability            | Incorrect data is unacceptable: payment, seat, auction bid | Temporary stale/unavailable data is okay: feeds, likes, presence |
+   | Latency vs correctness/durability      | Fast response matters; cache or async work is acceptable   | Must confirm durable result before replying                  |
+   | Synchronous vs asynchronous            | Caller needs the result now                                | Work is slow, retryable, or can happen later                 |
+   | Throughput vs per-request latency      | Batch, queue, or buffer requests                           | Process immediately, even if less efficient                  |
+   | Read performance vs write cost         | Add indexes, replicas, materialized views, caches          | Keep writes simple/cheap                                     |
+   | Storage cost vs query speed            | Store denormalized/precomputed data                        | Normalize and compute/join at read time                      |
+   | Flexibility vs performance             | General SQL queries and evolving access patterns           | Known access patterns; specialized key-value schema          |
+   | Ordering vs parallelism                | One ordered stream per auction/account                     | Partition work for high throughput across independent keys   |
+   | Strong isolation vs concurrency        | Lock/serialize a hot resource to protect invariants        | Optimistic updates/retries when conflicts are rare           |
+   | Simplicity vs scalability              | One DB/service is sufficient initially                     | Shard, queue, and split services at very high scale          |
+   | Freshness vs cost                      | Serve cached/eventually consistent data                    | Read from primary / strongly consistent source               |
+   | Availability vs overload protection    | Admit all traffic and risk collapse                        | Rate-limit, shed load, or queue requests                     |
+   | At-most-once vs at-least-once delivery | Losing an unimportant notification is okay                 | Do not lose tasks; accept duplicates and make consumer idempotent |
+   | Push vs pull                           | Need real-time updates: WebSocket/SSE/webhook              | Periodic or user-driven checking: polling                    |
+
+   A few very common patterns:
+
+   ```text
+   Flash-sale tickets:
+   protect inventory correctness
+   → conditional DB write
+   → rate limiter + queue to absorb burst
+   → reject/hold users instead of overload
+   Social feed:
+   availability and low latency matter more than instant accuracy
+   → cache / async fan-out
+   → eventual consistency is acceptable
+   Payment:
+   durability and correctness matter most
+   → synchronous, transactional write
+   → idempotency key
+   → retry carefully
+   Popular auction:
+   one hot auction requires strict ordering
+   → conditional update at moderate load
+   → per-auction queue/sequencer at high contention
+   ```
+
+   A strong interview sentence is:
+
+   > “I’m trading a little freshness and implementation complexity for lower read latency. This is acceptable because the data is not financial or correctness-critical; the database remains the source of truth.”
+
+   Or, for the other direction:
+
+   > “I’ll sacrifice availability during a partition and fail closed, because accepting an incorrect bid or selling the same seat twice is worse than rejecting a request temporarily.”
+

@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Engineering Knowledge Base — RAG for large codebases</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#E7EDF2;
+    --grid:#D5DEE6;
+    --ink:#1B2430;
+    --mute:#5A6573;
+    --card:#FBFCFD;
+    --src:#2C5F8A;
+    --rag:#0D7A62;
+    --agent:#C45C26;
+    --eval:#6B4C9A;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--paper);color:var(--ink);font-family:'IBM Plex Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 24px}
+  header{padding:44px 0 8px}
+  .eyebrow{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--agent);font-weight:600}
+  header h1{font-size:34px;font-weight:700;letter-spacing:-.02em;margin:8px 0 10px}
+  .lede{max-width:880px;font-size:15px;line-height:1.62;color:var(--mute)}
+  section{margin:42px 0}
+  h2{font-size:21px;font-weight:700;margin-bottom:6px}
+  h2 .num{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--agent);margin-right:8px;letter-spacing:.08em}
+  .h2sub{font-size:13.5px;color:var(--mute);max-width:860px;line-height:1.55;margin-bottom:16px}
+  .cards{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .card{background:var(--card);border:1.5px solid var(--ink);border-radius:2px;padding:16px 18px;box-shadow:3px 3px 0 rgba(27,36,48,.08)}
+  .card h3{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;margin-bottom:10px}
+  .card.fn h3{color:var(--rag)} .card.nfr h3{color:var(--src)}
+  .card ul{list-style:none}
+  .card li{font-size:13px;line-height:1.5;padding:5px 0 5px 16px;position:relative}
+  .card li::before{content:"";position:absolute;left:0;top:11px;width:6px;height:6px;border:1.5px solid currentColor}
+  .card.fn li::before{border-color:var(--rag)} .card.nfr li::before{border-color:var(--src)}
+  .card li b{font-weight:600} .card li .why{color:var(--mute)}
+  .est{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  .e{background:var(--card);border:1.5px solid var(--ink);padding:13px 14px}
+  .e .k{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute)}
+  .e .v{font-size:20px;font-weight:700;margin:4px 0 3px}
+  .e .d{font-size:11.5px;line-height:1.4;color:var(--mute)}
+  .note{margin-top:12px;font-size:13px;line-height:1.55;color:var(--mute);max-width:900px}
+  .note b{color:var(--ink)}
+  table{width:100%;border-collapse:collapse;background:var(--card);border:1.5px solid var(--ink);font-size:12.5px}
+  th{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;text-align:left;padding:9px 11px;border-bottom:1.5px solid var(--ink);background:var(--paper)}
+  td{padding:9px 11px;border-bottom:1px solid var(--grid);vertical-align:top;line-height:1.5}
+  tr:last-child td{border-bottom:none}
+  td.dec{font-weight:600;white-space:nowrap}
+  .pick{color:var(--rag);font-weight:600} .cost{color:var(--agent)}
+  .uses{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+  .use{background:var(--card);border:1.5px solid var(--ink);padding:14px 15px}
+  .use h4{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;color:var(--src)}
+  .use p{font-size:12.5px;line-height:1.5;color:var(--mute)}
+  .use p b{color:var(--ink)}
+  .board-scroll{overflow-x:auto;margin:0 -24px;padding:0 24px}
+  .board{position:relative;width:1320px;height:780px;margin:8px auto 0;border:2px solid var(--ink);
+    background:repeating-linear-gradient(0deg,transparent 0 31px,var(--grid) 31px 32px),
+      repeating-linear-gradient(90deg,transparent 0 31px,var(--grid) 31px 32px),#EEF2F6}
+  .zone{position:absolute;border:1.5px dashed rgba(27,36,48,.4);z-index:1}
+  .zone span{position:absolute;top:-9px;left:12px;background:#EEF2F6;padding:0 7px;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;font-weight:600}
+  .node{position:absolute;background:var(--card);border:1.5px solid var(--ink);padding:9px 11px;z-index:2;box-shadow:3px 3px 0 rgba(27,36,48,.1)}
+  .node h4{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px}
+  .node p{font-size:11px;line-height:1.4;color:var(--mute)} .node p b{color:var(--ink)}
+  .ns h4{color:var(--src)} .nr h4{color:var(--rag)} .na h4{color:var(--agent)} .ne h4{color:var(--eval)}
+  svg.w{position:absolute;inset:0;width:1320px;height:780px;pointer-events:none;z-index:3}
+  .spoken{background:var(--card);border:1.5px solid var(--ink);border-left:5px solid var(--rag);padding:16px 18px;margin-top:16px}
+  .spoken .tag{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--rag);font-weight:600;margin-bottom:8px}
+  .spoken p{font-size:14px;line-height:1.65}
+  footer{margin:48px 0 36px;padding-top:14px;border-top:2px solid var(--ink);font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--mute);line-height:1.7}
+  footer b{color:var(--ink)}
+  @media (max-width:900px){.cards,.est,.uses{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">TikTok GA · JD: knowledge management across large codebases</div>
+  <h1>Design an engineering knowledge base</h1>
+  <p class="lede">Not “ChatGPT over Confluence.” A control-plane memory for <b>humans and AI agents</b>:
+  the same retrieved context that answers “where is rate-limit enforced?” also feeds diagnosis, refactor,
+  and CI fix agents. RAG is the retrieval kernel — enterprise pattern below — not the whole product.
+  Pair with <span class="mono">rag_system_design.html</span> for HNSW / hybrid / rerank mechanics.</p>
+</header>
+
+<section>
+  <h2><span class="num">01</span>Functional requirements — say these first, then confirm</h2>
+  <p class="h2sub">Ask: which corpora? code-only or wiki+tickets+CI? agents as users or only humans? auto-apply patches or retrieve-and-cite? Confirm ACL: code is confidential.</p>
+  <div class="cards">
+    <div class="card fn">
+      <h3>Functional</h3>
+      <ul>
+        <li><b>Ingest</b> living sources: git (file+PR+ADR), wiki/runbooks, tickets, CI logs / flaky history, CODEOWNERS, service catalog. Continuous, not a nightly dump.</li>
+        <li><b>Ask</b>: NL question → grounded answer with citations (repo path + commit SHA, or ticket id). “Not found” is a valid answer.</li>
+        <li><b>Navigate</b>: jump from a symbol / stack trace / failing test to owners, tests, last incidents, related ADRs.</li>
+        <li><b>Agent retrieve API</b>: same ACL as humans; tool returns chunks + citations, not a hallucinated essay. First-class citizen of the platform (JD).</li>
+        <li><b>Write-back</b> (optional v2): agent proposes a doc/code patch; lands only through CI + owners — KB does not auto-merge.</li>
+        <li><b>Eval</b>: golden Q→chunk set; recall@k gates every embedder/chunker change. Same discipline as the Microsoft benchmark pipeline.</li>
+      </ul>
+    </div>
+    <div class="card nfr">
+      <h3>Non-functional</h3>
+      <ul>
+        <li><b>ACL at retrieval</b>, never after generation. A leak of an internal service is an incident.</li>
+        <li><b>Freshness</b>: merged PR reflected in index within minutes; wiki/ticket in ≤15 min.</li>
+        <li><b>Latency</b>: interactive p95 TTFT ≤ 2s; agent-tool retrieve ≤ 200 ms of that (same budget as generic RAG).</li>
+        <li><b>Groundedness</b>: no claim without a cited chunk. Hallucinated imports are correctness bugs.</li>
+        <li><b>Scale</b>: 10<sup>8</sup>–10<sup>9</sup> LOC class monorepo + years of tickets; index rebuilds without downtime.</li>
+        <li><b>Cost</b>: LLM tokens dominate; retrieval exists to keep agent context small (task-local, not whole-repo).</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="num">02</span>How enterprises actually use RAG</h2>
+  <p class="h2sub">Interviewers hear “RAG” and picture a chatbot. Name the <b>pattern</b> first: retrieve-then-generate over private corpora, with citations and ACL. Then name the <b>jobs</b> companies actually buy.</p>
+  <div class="uses">
+    <div class="use">
+      <h4>1. Internal Q&amp;A</h4>
+      <p>HR, policy, onboarding wiki. <b>Job:</b> replace “ask in Slack.” Failure mode: stale page still ranks #1. Fix: ingest timestamps + recency in rank, expire chunks when the doc is archived.</p>
+    </div>
+    <div class="use">
+      <h4>2. Support / tickets</h4>
+      <p>Manuals + past tickets. <b>Job:</b> draft a reply with links. Failure: citing another customer’s ticket. Fix: ACL + PII strip at ingest, not in the prompt.</p>
+    </div>
+    <div class="use">
+      <h4>3. Code copilot / “where is X”</h4>
+      <p>This JD. <b>Job:</b> locate implementation, not write a novel. Hybrid: BM25 for <code>FooService</code>, vectors for “how do we retry payments.” Cite <b>path@SHA</b>.</p>
+    </div>
+    <div class="use">
+      <h4>4. Incident / on-call</h4>
+      <p>Runbooks + similar pages + last postmortem. <b>Job:</b> shorten time-to-mitigate. Failure: retrieving the wrong service’s runbook. Fix: identity keys — service name, env, cluster — source-visible in the chunk (same lesson as your benchmark specs).</p>
+    </div>
+    <div class="use">
+      <h4>5. Compliance / legal</h4>
+      <p>Contracts, policies. <b>Job:</b> extract clauses with audit trail. Highest ACL; often air-gapped index; human always in the loop.</p>
+    </div>
+    <div class="use">
+      <h4>6. What RAG is not</h4>
+      <p>Not a replacement for tests, CI, or source of truth. RAG <b>points at</b> git/wiki. If wiki and code disagree, <b>code+CI win</b>; the answer should say both and flag drift.</p>
+    </div>
+  </div>
+  <p class="note"><b>Shared architecture every enterprise copy-pastes:</b> connectors → parse/chunk → embed → vector + keyword indexes → query rewrite → hybrid retrieve → rerank → generate with citations.
+  The product difference is <b>corpus + ACL + freshness + eval</b>, not a new neural net. For this team, add a second consumer: <b>agents calling retrieve as a tool</b> on the same indexes.</p>
+</section>
+
+<section>
+  <h2><span class="num">03</span>Scale (unprompted)</h2>
+  <div class="est">
+    <div class="e"><div class="k">Code chunks</div><div class="v">~80–200 M</div><div class="d">Monorepo: 50 M LOC-equivalent × functions/blocks, plus 2–3 years of PR text</div></div>
+    <div class="e"><div class="k">Docs / tickets</div><div class="v">~20–50 M</div><div class="d">Wiki pages, Jira, on-call notes — smaller than code, higher ACL diversity</div></div>
+    <div class="e"><div class="k">Query mix</div><div class="v">human + agent</div><div class="d">IDE/chat QPS modest; agent loops can 10× retrieve per user action — budget agents separately</div></div>
+    <div class="e"><div class="k">Freshness SLA</div><div class="v">minutes</div><div class="d">PR merge webhook → re-chunk changed files only; nightly full reconcile</div></div>
+  </div>
+  <p class="note"><b>Say out loud:</b> code RAG is not “one HNSW for everything.” Split indexes by <b>corpus</b> (code / docs / ci_logs) so BM25 tokenizers and ACL tags stay sane. Embed model version pinned per index; upgrade = side-by-side rebuild (same as your RAG SD).</p>
+</section>
+
+<section>
+  <h2><span class="num">04</span>Architecture — sources · RAG kernel · agent consumers</h2>
+  <p class="h2sub">Thesis: <b>one retrieval plane, many jobs.</b> Maintenance / refactor / diagnosis / CI-opt are different planners that all call <code>retrieve(query, filters, acl)</code>.</p>
+  <div class="board-scroll">
+  <div class="board">
+    <div class="zone" style="left:16px;top:28px;width:300px;height:730px;border-color:var(--src)"><span style="color:var(--src)">Sources (ingest)</span></div>
+    <div class="zone" style="left:340px;top:28px;width:420px;height:730px;border-color:var(--rag)"><span style="color:var(--rag)">RAG kernel</span></div>
+    <div class="zone" style="left:784px;top:28px;width:520px;height:430px;border-color:var(--agent)"><span style="color:var(--agent)">Consumers — humans + agents</span></div>
+    <div class="zone" style="left:784px;top:480px;width:520px;height:278px;border-color:var(--eval)"><span style="color:var(--eval)">Eval + policy</span></div>
+    <svg class="w" viewBox="0 0 1320 780">
+      <defs>
+        <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2C5F8A"/></marker>
+        <marker id="b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#0D7A62"/></marker>
+        <marker id="c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#C45C26"/></marker>
+      </defs>
+      <path d="M316,90 H338" stroke="#2C5F8A" stroke-width="2" marker-end="url(#a)"/>
+      <path d="M316,200 H338" stroke="#2C5F8A" stroke-width="2" marker-end="url(#a)"/>
+      <path d="M316,310 H338" stroke="#2C5F8A" stroke-width="2" marker-end="url(#a)"/>
+      <path d="M316,430 H338" stroke="#2C5F8A" stroke-width="2" marker-end="url(#a)"/>
+      <path d="M316,550 H338" stroke="#2C5F8A" stroke-width="2" marker-end="url(#a)"/>
+      <path d="M760,280 H782" stroke="#0D7A62" stroke-width="2" marker-end="url(#b)"/>
+      <path d="M760,280 H771 V560 H782" stroke="#0D7A62" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#b)"/>
+    </svg>
+    <div class="node ns" style="left:32px;top:52px;width:268px"><h4>Git / monorepo</h4><p>Files, blame, PRs, ADRs. Webhook on merge. Chunk by <b>symbol / AST</b>, not 512 naive tokens.</p></div>
+    <div class="node ns" style="left:32px;top:162px;width:268px"><h4>Wiki + runbooks</h4><p>Structure-aware chunks; <b>service name</b> as identity key on every chunk.</p></div>
+    <div class="node ns" style="left:32px;top:272px;width:268px"><h4>Tickets / incidents</h4><p>Resolved tickets + postmortems. PII scrub. Link to <b>service + SHA</b>.</p></div>
+    <div class="node ns" style="left:32px;top:392px;width:268px"><h4>CI / CD telemetry</h4><p>Fail logs, flaky-test history, deploy SHAs. Powers “similar failure” retrieve.</p></div>
+    <div class="node ns" style="left:32px;top:512px;width:268px"><h4>Catalog + owners</h4><p>CODEOWNERS, service dir, on-call. Not embedded — <b>join at retrieve</b> as filters.</p></div>
+    <div class="node ns" style="left:32px;top:632px;width:268px"><h4>Queue + workers</h4><p>Idempotent <code>doc@version</code>. Re-embed only diffs. Dead-letter for parse fails.</p></div>
+
+    <div class="node nr" style="left:356px;top:52px;width:388px"><h4>Parse / chunk / enrich</h4><p>Language parsers + markdown. Attach: repo, path, SHA, lang, owners, ACL tags, service.</p></div>
+    <div class="node nr" style="left:356px;top:162px;width:388px"><h4>Hybrid indexes</h4><p><b>HNSW</b> per corpus + BM25 + optional structural (SCIP/ctags). Filter ACL <b>inside</b> the query.</p></div>
+    <div class="node nr" style="left:356px;top:280px;width:388px"><h4>Retrieve API</h4><p><code>retrieve(q, k, filters, principal)</code> → chunks + scores + citations. Query rewrite for follow-ups. RRF + cross-encoder rerank.</p></div>
+    <div class="node nr" style="left:356px;top:410px;width:388px"><h4>Generate (optional)</h4><p>Human chat: grounding prompt + citations. Agents often skip generate — they want <b>chunks only</b> in the tool result.</p></div>
+    <div class="node nr" style="left:356px;top:530px;width:388px"><h4>Freshness</h4><p>File-level incremental. Wiki CDC. Nightly crawl as reconcile — same dual-path as your RAG SD.</p></div>
+    <div class="node nr" style="left:356px;top:640px;width:388px"><h4>Caches</h4><p>Query-embed cache; short TTL semantic cache for human FAQ only — <b>off for agent diagnosis</b> (stale runbook kills).</p></div>
+
+    <div class="node na" style="left:800px;top:52px;width:488px"><h4>Human: IDE / portal</h4><p>“Where is X / how do we Y” — streamed answer, citations clickable to source@SHA.</p></div>
+    <div class="node na" style="left:800px;top:148px;width:488px"><h4>Diagnosis / repair agent</h4><p>Stack trace → retrieve similar incidents + owning service + tests. Patch in sandbox; CI is the judge.</p></div>
+    <div class="node na" style="left:800px;top:244px;width:488px"><h4>Refactor / maintenance agent</h4><p>Retrieve call graph + tests + ADR constraints. Incremental diffs (long-horizon harness: feature list, not one-shot).</p></div>
+    <div class="node na" style="left:800px;top:350px;width:488px"><h4>CI optimization</h4><p>Retrieve flaky history + impacted tests from the diff. Suggest quarantine / test-impact; never skip the deterministic gate.</p></div>
+    <div class="node ne" style="left:800px;top:504px;width:488px"><h4>Eval harness</h4><p>Gold: “this question → these files.” Recall@8 ≥ 90%. Agent tasks: patch applies + tests (productivity / stability / correctness from JD line 12).</p></div>
+    <div class="node ne" style="left:800px;top:620px;width:488px"><h4>Policy</h4><p>Least privilege on tools. Secrets never in chunks. Human approval above risk score. Audit log of every retrieve.</p></div>
+  </div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="num">05</span>Trade-offs</h2>
+  <table>
+    <thead><tr><th>Decision</th><th>Options</th><th>Pick</th><th>Give up</th></tr></thead>
+    <tbody>
+      <tr><td class="dec">Chunking code</td><td>Fixed tokens · by file · by AST/symbol</td><td><span class="pick">AST / function-level + file header (imports).</span> Retrieve a whole function, not a split <code>if</code>.</td><td class="cost">Parser per language; generated code still noisy.</td></tr>
+      <tr><td class="dec">One index vs many</td><td>Single HNSW · per-corpus · per-tenant</td><td><span class="pick">Per-corpus (code / docs / ci) + tenant or workspace ACL tags.</span></td><td class="cost">N retrieves + merge; need a router.</td></tr>
+      <tr><td class="dec">Generate vs retrieve-only</td><td>Always LLM · hybrid · chunks-only for agents</td><td><span class="pick">Humans get generate+cite; agents get chunks.</span> Stops the model rewriting APIs.</td><td class="cost">Two API shapes to maintain.</td></tr>
+      <tr><td class="dec">Wiki vs code conflict</td><td>Trust wiki · trust code · show both</td><td><span class="pick">Show both; prefer CI-green code as truth; flag drift.</span></td><td class="cost">Messier UX; better on-call.</td></tr>
+      <tr><td class="dec">Agent write-back</td><td>KB auto-edits docs · PR only</td><td><span class="pick">PR + CODEOWNERS.</span> Knowledge updates are code review.</td><td class="cost">Slower doc fixes; no silent wiki rot from a model.</td></tr>
+      <tr><td class="dec">Eval</td><td>Vibes · LLM-as-judge only · gold retrieve + tests</td><td><span class="pick">Gold retrieve + (for repair agents) tests pass.</span> Isolated judge optional.</td><td class="cost">Need an eval set; you already know how to build one.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section>
+  <h2><span class="num">06</span>Walk one diagnosis query</h2>
+  <p class="h2sub">“Payment p99 spiked after deploy abc123 — what do we know?” Agent, not a chatbot essay.</p>
+  <ol class="lede" style="padding-left:20px;max-width:880px">
+    <li>Auth the agent’s service account; ACL = that team’s services only.</li>
+    <li>Router: intent = incident → query rewrite includes service name, SHA, “p99”, “payment”.</li>
+    <li>Parallel retrieve: code (deploy diff files), runbooks (identity key = payment-svc), CI (that SHA’s jobs), tickets (similar alerts).</li>
+    <li>Rerank; return top chunks with path@SHA / ticket ids. <b>No generate</b> unless a human opened chat.</li>
+    <li>Repair agent uses chunks + sandbox + tests. KB logs the retrieve for eval (“did we surface the right runbook?”).</li>
+  </ol>
+</section>
+
+<div class="spoken">
+  <div class="tag">Spoken · 45s opener</div>
+  <p>I’d start from requirements: we need a living knowledge base over a large codebase that both developers and AI agents can query, with citations and ACL at retrieval time — not after the model speaks. Enterprises already use RAG as retrieve-then-generate over private wikis, tickets, and code; the standard shape is ingest, hybrid search, rerank, generate with sources. For this JD the twist is the consumers: diagnosis, refactor, and CI agents call the same retrieve API and get chunks, not a paragraph. Code is chunked by AST, indexes are split by corpus, freshness is webhook-driven, and we eval recall against a gold set the same way I gated benchmark facts. The knowledge base does not auto-merge; agents still go through CI. RAG is the kernel; the product is memory plus policy plus eval.</p>
+</div>
+
+<footer>
+  <b>Don’t forget:</b> ACL in the index query · cite path@SHA · agents ≠ chat · eval recall@k · code wins vs stale wiki.
+  Full RAG knobs (HNSW, RRF, rerank): <b>rag_system_design.html</b>.
+</footer>
+</div>
+</body>
+</html>

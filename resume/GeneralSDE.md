@@ -20,5 +20,6 @@ BroswerUse Bot 										             March 2026 - May 2026 Team Leader
 • Instrumented the LLM pipeline with Langfuse tracing (per-step tokens, latency, cost, errors), enabling request-ID ’ trace lookup  to debug production runs and attribute per-task cost. 
 • Built a GitHub Actions CI/CD pipeline auto-deploying to AWS EC2 with health-check rollback, running the agent 24/7; reduced deployments to a single push (from manual multi-step to ~2 min, zero-downtime). 
 SKILLS 
-Programming Language: Java, C/C++, Python, JavaScript, SQL 
-Technologies: Spring Boot, Django, FastAPI, Vue.js, React, MySQL, PostgreSQL, Redis, Elasticsearch, Docker, AWS, LLM Agents,  RAG, SFT, Langfuse, GRPO
+Languages: Java, Go, C/C++, Python, JavaScript, SQL
+Backend: Spring Boot, MyBatis, FastAPI, JSON-RPC, Protocol Buffers, MySQL, PostgreSQL, Redis, Elasticsearch, Docker
+Also: AWS, LLM Agents, RAG, Langfuse, SFT, GRPO

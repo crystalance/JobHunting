@@ -123,6 +123,8 @@ Bachelor's, Software Engineering
 
 ## SKILLS
 
-**Languages:** Python, Go, Java, C/C++, JavaScript, SQL
+**Languages:** Java, Go, C/C++, Python, JavaScript, SQL
 
-**Technologies:** FastAPI, Spring Boot, JSON-RPC, LLM Agents, Langfuse, MySQL, PostgreSQL, Redis, Docker, AWS
+**Backend:** Spring Boot, MyBatis, FastAPI, JSON-RPC, Protocol Buffers, MySQL, PostgreSQL, Redis, Elasticsearch, Docker
+
+**Also:** AWS, LLM Agents, RAG, Langfuse, SFT, GRPO

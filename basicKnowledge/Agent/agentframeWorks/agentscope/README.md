@@ -63,6 +63,8 @@ Current `main` folded the old `ReActAgent` into one class. The loop is still rea
 
 `asyncio.md` walks `execute` → `stream_query` → `_call_model` and separates the three parks: a coroutine on the heap (`await` / `yield`), the one server thread inside `kevent` or `epoll_wait`, and a real child process from `subprocess.Popen`. The Java column is virtual threads and Netty versus platform threads versus `ProcessBuilder`. The state diagram and the loop flowchart are in “One coroutine, as a graph,” with the Python docs link.
 
+`async-qa.md` is the follow-up: `async for` versus `await`, why `await` does not sleep the thread, what a parked frame is, and the process memory model those frames sit in.
+
 ## Suggested pass
 
 1. `a2a_agent_adapter.py` `execute` and `cancel` — one sitting.
